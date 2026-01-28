@@ -23,14 +23,30 @@
             margin: 0 auto;
         }
 
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
         h1 {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: #fff;
             padding: 12px 20px;
             border-radius: 8px;
             font-size: 1.4rem;
-            margin-bottom: 24px;
-            text-align: center;
+            margin: 0;
+        }
+
+        .about-link {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.95rem;
+        }
+
+        .about-link:hover {
+            text-decoration: underline;
         }
 
         .monitors {
@@ -334,7 +350,10 @@
 </head>
 <body>
     <div class="container">
-        <h1>NES Outage Status Checker</h1>
+        <header>
+            <h1>NES Outage Status Checker</h1>
+            <a href="about.html" class="about-link">About</a>
+        </header>
 
         <div class="monitors" id="monitors"></div>
 
