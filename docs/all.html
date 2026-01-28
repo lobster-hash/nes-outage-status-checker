@@ -329,6 +329,24 @@
         .hidden {
             display: none !important;
         }
+
+        .update-banner {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+            padding: 10px;
+            font-size: 0.9rem;
+            z-index: 1000;
+        }
+
+        .update-banner a {
+            color: white;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -398,6 +416,10 @@
             <a href="https://github.com/NeckBeardPrince/nes-outage-status-checker/blob/main/CHANGELOG.md" target="_blank">Changelog</a>
             <div class="built-with">Built with Claude AI</div>
         </footer>
+    </div>
+
+    <div class="update-banner hidden" id="updateBanner">
+        New version available! <a href="#" onclick="location.reload(); return false;">Refresh to update</a>
     </div>
 
     <script>
@@ -709,6 +731,27 @@
             saveSettings();
             fetchAllEvents();
         }
+
+        // Version check
+        const APP_VERSION = '1.1.0';
+
+        async function checkForUpdates() {
+            try {
+                const response = await fetch('version.json?_=' + Date.now());
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.version !== APP_VERSION) {
+                        document.getElementById('updateBanner').classList.remove('hidden');
+                    }
+                }
+            } catch (e) {
+                // Silently fail
+            }
+        }
+
+        // Check for updates every 5 minutes
+        setInterval(checkForUpdates, 5 * 60 * 1000);
+        setTimeout(checkForUpdates, 10000); // First check after 10 seconds
 
         // Initialize
         loadSettings();

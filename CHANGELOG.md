@@ -24,6 +24,7 @@ All notable changes to the NES Outage Status Checker will be documented in this 
 - **Responsive grid layout** - Monitors display side-by-side on wider screens
 - **Favicon** - Lightning bolt emoji for easy tab identification
 - **Dark theme** - Easy on the eyes during those late-night outages
+- **Auto-update detection** - Banner notification when a new version is available
 
 #### Web App - All Outages Page
 - **All outages dashboard** - View every active NES outage event in one place
