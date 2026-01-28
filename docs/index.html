@@ -704,7 +704,6 @@
                             <div id="duration-${id}" class="duration"></div>
                         </div>
                         <div class="monitor-actions">
-                            <button class="monitor-action-btn" onclick="openMap(${id})">View on Map</button>
                             <button class="monitor-action-btn" onclick="toggleHistory(${id})">History</button>
                         </div>
                         <div class="history hidden" id="history-${id}">
@@ -925,13 +924,6 @@
                 toast.classList.add('show');
                 setTimeout(() => toast.classList.remove('show'), 2000);
             });
-        }
-
-        function openMap(id) {
-            const eventId = monitors[id]?.eventId;
-            if (eventId) {
-                window.open(`https://www.nespower.com/outages/`, '_blank');
-            }
         }
 
         function toggleHistory(id) {
