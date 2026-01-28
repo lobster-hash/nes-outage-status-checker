@@ -126,11 +126,6 @@
 
         .monitor.priority {
             border-color: #2ed573;
-            order: -1;
-        }
-
-        .monitor.unassigned {
-            order: -2;
         }
 
         .monitor-header {
@@ -514,6 +509,7 @@
         <header>
             <h1>NES Outage Status Checker</h1>
             <div class="header-links">
+                <a href="all.html" class="header-link">All Outages</a>
                 <a href="https://github.com/NeckBeardPrince/nes-outage-status-checker/blob/main/README.md#finding-your-event-id" target="_blank" class="header-link">How to find Event ID</a>
             </div>
         </header>
@@ -526,7 +522,7 @@
             <div class="summary-actions">
                 <button class="icon-btn" onclick="copyURL()" title="Copy shareable URL">Copy URL</button>
                 <button class="icon-btn" id="compactBtn" onclick="toggleCompactView()" title="Toggle compact view">Compact</button>
-                <button class="icon-btn" id="sortBtn" onclick="toggleSort()" title="Sort by status">Sort</button>
+                <button class="icon-btn" id="sortBtn" onclick="toggleSort()" title="Sort assigned first">Sort</button>
             </div>
         </div>
 
@@ -873,15 +869,17 @@
             const container = document.getElementById('monitors');
             const monitorEls = Array.from(container.querySelectorAll('.monitor'));
 
+            // Sort: Assigned first when enabled
             if (sortByStatus) {
                 monitorEls.sort((a, b) => {
                     const aId = a.dataset.id;
                     const bId = b.dataset.id;
                     const aStatus = monitors[aId]?.previousStatus || '';
                     const bStatus = monitors[bId]?.previousStatus || '';
-                    // Unassigned first, then others
-                    if (aStatus === 'Unassigned' && bStatus !== 'Unassigned') return -1;
-                    if (bStatus === 'Unassigned' && aStatus !== 'Unassigned') return 1;
+                    const aAssigned = aStatus !== 'Unassigned' && aStatus !== '';
+                    const bAssigned = bStatus !== 'Unassigned' && bStatus !== '';
+                    if (aAssigned && !bAssigned) return -1;
+                    if (!aAssigned && bAssigned) return 1;
                     return 0;
                 });
             }
@@ -1091,13 +1089,12 @@
             const message = document.getElementById(`statusMessage-${id}`);
             const monitorEl = document.getElementById(`monitor-${id}`);
 
-            monitorEl.classList.remove('unassigned', 'priority');
+            monitorEl.classList.remove('priority');
 
             if (event.status === 'Unassigned') {
                 badge.className = 'status-badge status-unassigned';
                 badge.textContent = 'STATUS: UNASSIGNED';
                 message.textContent = 'No technician assigned yet';
-                monitorEl.classList.add('unassigned');
             } else {
                 badge.className = 'status-badge status-assigned';
                 badge.textContent = `STATUS: ${event.status.toUpperCase()}`;

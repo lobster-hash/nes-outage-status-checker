@@ -6,7 +6,7 @@ All notable changes to the NES Outage Status Checker will be documented in this 
 
 ### Added
 
-#### Web App
+#### Web App - Monitor Page
 - **Multi-monitor support** - Track up to 4 outage events simultaneously with individual status cards
 - **Custom labels** - Name each monitor (e.g., "Home", "Office", "Mom's house") for easy identification
 - **Shareable URLs** - Monitor configurations saved in URL (`?monitors=123:Home,456:Office`) for easy sharing
@@ -14,7 +14,7 @@ All notable changes to the NES Outage Status Checker will be documented in this 
 - **Sound alerts** - Optional audio chime when status changes
 - **Auto-refresh** - Configurable refresh intervals (1, 5, 10, 15, 30, or 60 minutes)
 - **Compact view** - Toggle to show only status badges for a condensed overview
-- **Sort by status** - Option to show unassigned (waiting) monitors first
+- **Sort by status** - Option to show assigned monitors first
 - **Status history** - Track status changes over time for each monitor (last 10 entries)
 - **Outage duration** - Display how long each outage has been ongoing
 - **Summary bar** - Shows total monitor count and combined affected people
@@ -24,6 +24,16 @@ All notable changes to the NES Outage Status Checker will be documented in this 
 - **Responsive grid layout** - Monitors display side-by-side on wider screens
 - **Favicon** - Lightning bolt emoji for easy tab identification
 - **Dark theme** - Easy on the eyes during those late-night outages
+
+#### Web App - All Outages Page
+- **All outages dashboard** - View every active NES outage event in one place
+- **Summary statistics** - Total events, unassigned count, assigned count, and total affected people
+- **Browser notifications** - Get notified when any event's status changes
+- **Sound alerts** - Optional audio chime when status changes
+- **Auto-refresh** - Configurable refresh intervals (10, 20, 30, 40, 50, or 60 minutes)
+- **Compact view** - Toggle to show condensed event cards
+- **Sort by status** - Option to show assigned events first (default on)
+- **Responsive grid layout** - Events display in a grid on wider screens
 
 #### CLI
 - **Makefile** - Quick build commands (`make build`, `make clean`, `make fmt`, `make vet`)

@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>All Outages - NES Outage Status Checker</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        h1 {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 1.4rem;
+            margin: 0;
+        }
+
+        .header-links {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .header-link {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.9rem;
+        }
+
+        .header-link:hover {
+            text-decoration: underline;
+        }
+
+        .summary-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #16213e;
+            border: 1px solid #3d3d5c;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .summary-stats {
+            display: flex;
+            gap: 20px;
+            font-size: 0.9rem;
+            flex-wrap: wrap;
+        }
+
+        .summary-stat {
+            color: #a0a0a0;
+        }
+
+        .summary-stat strong {
+            color: #e0e0e0;
+        }
+
+        .summary-stat.unassigned strong {
+            color: #ff6b6b;
+        }
+
+        .summary-stat.assigned strong {
+            color: #2ed573;
+        }
+
+        .summary-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .icon-btn {
+            padding: 6px 12px;
+            background: #3d3d5c;
+            border: none;
+            border-radius: 6px;
+            color: #e0e0e0;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: all 0.2s;
+        }
+
+        .icon-btn:hover {
+            background: #4d4d6c;
+        }
+
+        .icon-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .events {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .event-card {
+            border: 2px solid #3d3d5c;
+            border-radius: 12px;
+            padding: 16px;
+            background: #16213e;
+            transition: all 0.2s;
+        }
+
+        .event-card.unassigned {
+            border-color: #ff6b6b55;
+        }
+
+        .event-card.assigned {
+            border-color: #2ed57355;
+        }
+
+        .event-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .event-title {
+            font-weight: 600;
+            color: #e0e0e0;
+            font-size: 0.95rem;
+        }
+
+        .event-id {
+            color: #666;
+            font-size: 0.8rem;
+            font-family: monospace;
+        }
+
+        .field {
+            margin-bottom: 8px;
+            font-size: 0.85rem;
+        }
+
+        .label {
+            font-weight: 600;
+            color: #a0a0a0;
+            margin-right: 6px;
+        }
+
+        .value {
+            color: #e0e0e0;
+        }
+
+        .status-badge {
+            font-size: 0.9rem;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 6px;
+            display: inline-block;
+        }
+
+        .status-unassigned {
+            background: rgba(255, 107, 107, 0.2);
+            color: #ff6b6b;
+        }
+
+        .status-assigned {
+            background: rgba(46, 213, 115, 0.2);
+            color: #2ed573;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .duration {
+            color: #ffa502;
+            font-size: 0.8rem;
+            margin-top: 8px;
+        }
+
+        .details-content {
+            margin-bottom: 12px;
+        }
+
+        .compact .details-content {
+            display: none;
+        }
+
+        .compact .event-header {
+            margin-bottom: 8px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: #a0a0a0;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid #3d3d5c;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error {
+            text-align: center;
+            padding: 60px 20px;
+            color: #ff6b6b;
+        }
+
+        .meta {
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid #3d3d5c;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85rem;
+            color: #666;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .options {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .option-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .option-group label {
+            color: #888;
+        }
+
+        select {
+            padding: 4px 8px;
+            border: 1px solid #3d3d5c;
+            border-radius: 4px;
+            background: #16213e;
+            color: #e0e0e0;
+            font-size: 0.85rem;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .toggle-btn {
+            padding: 4px 10px;
+            font-size: 0.8rem;
+            background: #3d3d5c;
+            border: none;
+            border-radius: 4px;
+            color: #e0e0e0;
+            cursor: pointer;
+        }
+
+        .toggle-btn.enabled {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        footer {
+            margin-top: 32px;
+            padding-top: 20px;
+            border-top: 1px solid #3d3d5c;
+            text-align: center;
+            font-size: 0.8rem;
+            color: #555;
+        }
+
+        footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        .built-with {
+            margin-top: 8px;
+            color: #444;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>All NES Outages</h1>
+            <div class="header-links">
+                <a href="index.html" class="header-link">&larr; Back to Monitor</a>
+            </div>
+        </header>
+
+        <div class="summary-bar">
+            <div class="summary-stats">
+                <span class="summary-stat">Total: <strong id="totalCount">0</strong></span>
+                <span class="summary-stat unassigned">Unassigned: <strong id="unassignedCount">0</strong></span>
+                <span class="summary-stat assigned">Assigned: <strong id="assignedCount">0</strong></span>
+                <span class="summary-stat">Affected: <strong id="totalAffected">0</strong></span>
+            </div>
+            <div class="summary-actions">
+                <button class="icon-btn" id="compactBtn" onclick="toggleCompactView()" title="Toggle compact view">Compact</button>
+                <button class="icon-btn active" id="sortBtn" onclick="toggleSort()" title="Sort assigned first">Sort</button>
+            </div>
+        </div>
+
+        <div id="loading" class="loading">
+            <span class="spinner"></span> Loading all outages...
+        </div>
+
+        <div id="error" class="error hidden"></div>
+
+        <div class="events" id="events"></div>
+
+        <div class="meta">
+            <span id="lastChecked"></span>
+            <div class="options">
+                <div class="option-group">
+                    <label for="refreshInterval">Refresh:</label>
+                    <select id="refreshInterval">
+                        <option value="0">Off</option>
+                        <option value="600000" selected>10 min</option>
+                        <option value="1200000">20 min</option>
+                        <option value="1800000">30 min</option>
+                        <option value="2400000">40 min</option>
+                        <option value="3000000">50 min</option>
+                        <option value="3600000">60 min</option>
+                    </select>
+                </div>
+                <button id="notifyBtn" class="toggle-btn" onclick="toggleNotifications()">
+                    Notifications: Off
+                </button>
+                <button id="soundBtn" class="toggle-btn" onclick="toggleSound()">
+                    Sound: Off
+                </button>
+            </div>
+        </div>
+
+        <footer>
+            <a href="https://github.com/NeckBeardPrince/nes-outage-status-checker" target="_blank">GitHub</a>
+            &middot;
+            <a href="https://github.com/NeckBeardPrince/nes-outage-status-checker/blob/main/CHANGELOG.md" target="_blank">Changelog</a>
+            <div class="built-with">Built with Claude AI</div>
+        </footer>
+    </div>
+
+    <script>
+        const API_URL = 'https://utilisocial.io/datacapable/v2/p/NES/map/events';
+        const SETTINGS_KEY = 'nes-outage-all-settings';
+        let refreshTimer = null;
+        let notificationsEnabled = false;
+        let soundEnabled = false;
+        let compactView = false;
+        let sortByStatus = true;
+        let previousEvents = {};
+        let audioContext = null;
+
+        function playNotificationSound() {
+            if (!soundEnabled) return;
+            try {
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+                oscillator.frequency.value = 880;
+                oscillator.type = 'sine';
+                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 0.5);
+            } catch (e) {
+                console.log('Audio not supported');
+            }
+        }
+
+        function saveSettings() {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+                compactView,
+                sortByStatus,
+                soundEnabled
+            }));
+        }
+
+        function loadSettings() {
+            try {
+                const data = localStorage.getItem(SETTINGS_KEY);
+                if (data) {
+                    const settings = JSON.parse(data);
+                    compactView = settings.compactView || false;
+                    sortByStatus = settings.sortByStatus !== false;
+                    soundEnabled = settings.soundEnabled || false;
+                    updateSettingsUI();
+                }
+            } catch {}
+        }
+
+        function updateSettingsUI() {
+            document.getElementById('compactBtn').classList.toggle('active', compactView);
+            document.getElementById('sortBtn').classList.toggle('active', sortByStatus);
+            document.getElementById('soundBtn').textContent = `Sound: ${soundEnabled ? 'On' : 'Off'}`;
+            document.getElementById('soundBtn').classList.toggle('enabled', soundEnabled);
+        }
+
+        function formatDate(timestamp) {
+            return new Date(timestamp).toLocaleString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+            });
+        }
+
+        function formatDuration(startTime) {
+            const now = Date.now();
+            const diff = now - startTime;
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+            if (hours > 0) {
+                return `Ongoing for ${hours}h ${minutes}m`;
+            }
+            return `Ongoing for ${minutes}m`;
+        }
+
+        function createEventCard(event) {
+            const isUnassigned = event.status === 'Unassigned';
+            const statusClass = isUnassigned ? 'unassigned' : 'assigned';
+            const badgeClass = isUnassigned ? 'status-unassigned' : 'status-assigned';
+
+            return `
+                <div class="event-card ${statusClass} ${compactView ? 'compact' : ''}" data-id="${event.id}" data-status="${event.status}">
+                    <div class="event-header">
+                        <div>
+                            <div class="event-title">${event.title || 'Outage'}</div>
+                            <div class="event-id">ID: ${event.id}</div>
+                        </div>
+                        <span class="status-badge ${badgeClass}">${event.status.toUpperCase()}</span>
+                    </div>
+                    <div class="details-content">
+                        <div class="field">
+                            <span class="label">Affected:</span>
+                            <span class="value">${event.numPeople} people</span>
+                        </div>
+                        ${event.cause ? `<div class="field"><span class="label">Cause:</span><span class="value">${event.cause}</span></div>` : ''}
+                        <div class="field">
+                            <span class="label">Started:</span>
+                            <span class="value">${formatDate(event.startTime)}</span>
+                        </div>
+                        <div class="field">
+                            <span class="label">Updated:</span>
+                            <span class="value">${formatDate(event.lastUpdatedTime)}</span>
+                        </div>
+                    </div>
+                    <div class="duration">${formatDuration(event.startTime)}</div>
+                </div>
+            `;
+        }
+
+        function updateSummary(events) {
+            const unassigned = events.filter(e => e.status === 'Unassigned').length;
+            const assigned = events.length - unassigned;
+            const totalAffected = events.reduce((sum, e) => sum + (e.numPeople || 0), 0);
+
+            document.getElementById('totalCount').textContent = events.length;
+            document.getElementById('unassignedCount').textContent = unassigned;
+            document.getElementById('assignedCount').textContent = assigned;
+            document.getElementById('totalAffected').textContent = totalAffected.toLocaleString();
+        }
+
+        function checkForChanges(events) {
+            const changes = [];
+
+            events.forEach(event => {
+                const prev = previousEvents[event.id];
+                if (prev && prev.status !== event.status) {
+                    changes.push({
+                        id: event.id,
+                        title: event.title,
+                        oldStatus: prev.status,
+                        newStatus: event.status
+                    });
+                }
+            });
+
+            if (changes.length > 0) {
+                changes.forEach(change => {
+                    const message = change.newStatus === 'Unassigned'
+                        ? `Event ${change.id}: Status changed to Unassigned`
+                        : `Event ${change.id}: Technician assigned! (${change.newStatus})`;
+                    sendNotification('NES Outage Update', message);
+                });
+            }
+
+            // Update previous events
+            previousEvents = {};
+            events.forEach(e => {
+                previousEvents[e.id] = { status: e.status };
+            });
+        }
+
+        function sendNotification(title, body) {
+            if (notificationsEnabled && Notification.permission === 'granted') {
+                new Notification(title, {
+                    body: body,
+                    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">⚡</text></svg>'
+                });
+            }
+            playNotificationSound();
+        }
+
+        async function fetchAllEvents() {
+            const loadingEl = document.getElementById('loading');
+            const errorEl = document.getElementById('error');
+            const eventsEl = document.getElementById('events');
+
+            if (Object.keys(previousEvents).length === 0) {
+                loadingEl.classList.remove('hidden');
+            }
+            errorEl.classList.add('hidden');
+
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) throw new Error('Failed to fetch outage data');
+
+                let events = await response.json();
+
+                // Check for status changes before updating
+                if (Object.keys(previousEvents).length > 0) {
+                    checkForChanges(events);
+                } else {
+                    // Initial load - store previous events
+                    events.forEach(e => {
+                        previousEvents[e.id] = { status: e.status };
+                    });
+                }
+
+                // Sort: Assigned first when enabled
+                if (sortByStatus) {
+                    events.sort((a, b) => {
+                        const aAssigned = a.status !== 'Unassigned';
+                        const bAssigned = b.status !== 'Unassigned';
+                        if (aAssigned && !bAssigned) return -1;
+                        if (!aAssigned && bAssigned) return 1;
+                        return b.numPeople - a.numPeople; // Secondary sort by affected
+                    });
+                }
+
+                updateSummary(events);
+                eventsEl.innerHTML = events.map(createEventCard).join('');
+                loadingEl.classList.add('hidden');
+
+                document.getElementById('lastChecked').textContent = `Last checked: ${new Date().toLocaleTimeString()}`;
+
+                startAutoRefresh();
+            } catch (err) {
+                loadingEl.classList.add('hidden');
+                errorEl.classList.remove('hidden');
+                errorEl.textContent = `Error: ${err.message}`;
+            }
+        }
+
+        function startAutoRefresh() {
+            stopAutoRefresh();
+            const interval = parseInt(document.getElementById('refreshInterval').value);
+            if (interval > 0) {
+                refreshTimer = setInterval(fetchAllEvents, interval);
+            }
+        }
+
+        function stopAutoRefresh() {
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+                refreshTimer = null;
+            }
+        }
+
+        document.getElementById('refreshInterval').addEventListener('change', startAutoRefresh);
+
+        async function toggleNotifications() {
+            const btn = document.getElementById('notifyBtn');
+
+            if (notificationsEnabled) {
+                notificationsEnabled = false;
+                btn.textContent = 'Notifications: Off';
+                btn.classList.remove('enabled');
+                return;
+            }
+
+            if (!('Notification' in window)) {
+                alert('This browser does not support notifications');
+                return;
+            }
+
+            if (Notification.permission === 'granted') {
+                notificationsEnabled = true;
+                btn.textContent = 'Notifications: On';
+                btn.classList.add('enabled');
+            } else if (Notification.permission !== 'denied') {
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    notificationsEnabled = true;
+                    btn.textContent = 'Notifications: On';
+                    btn.classList.add('enabled');
+                }
+            } else {
+                alert('Notifications are blocked. Please enable them in your browser settings.');
+            }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const btn = document.getElementById('soundBtn');
+            btn.textContent = `Sound: ${soundEnabled ? 'On' : 'Off'}`;
+            btn.classList.toggle('enabled', soundEnabled);
+            saveSettings();
+            if (soundEnabled) {
+                playNotificationSound();
+            }
+        }
+
+        function toggleCompactView() {
+            compactView = !compactView;
+            document.getElementById('compactBtn').classList.toggle('active', compactView);
+            document.querySelectorAll('.event-card').forEach(el => {
+                el.classList.toggle('compact', compactView);
+            });
+            saveSettings();
+        }
+
+        function toggleSort() {
+            sortByStatus = !sortByStatus;
+            document.getElementById('sortBtn').classList.toggle('active', sortByStatus);
+            saveSettings();
+            fetchAllEvents();
+        }
+
+        // Initialize
+        loadSettings();
+        fetchAllEvents();
+    </script>
+</body>
+</html>
