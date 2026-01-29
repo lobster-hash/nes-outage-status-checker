@@ -119,8 +119,10 @@
 
         .summary-stats {
             display: flex;
-            gap: 20px;
-            font-size: 0.9rem;
+            gap: 16px;
+            font-size: 0.85rem;
+            flex-wrap: wrap;
+            align-items: center;
         }
 
         .summary-stat {
@@ -133,7 +135,9 @@
 
         .summary-actions {
             display: flex;
-            gap: 8px;
+            gap: 6px;
+            flex-wrap: wrap;
+            align-items: center;
         }
 
         .icon-btn {
@@ -427,36 +431,6 @@
             color: #667eea;
         }
 
-        .meta {
-            margin-top: 20px;
-            padding-top: 16px;
-            border-top: 1px solid #3d3d5c;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.85rem;
-            color: #666;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-
-        .options {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-
-        .option-group {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .option-group label {
-            color: #888;
-        }
-
         select {
             padding: 4px 8px;
             border: 1px solid #3d3d5c;
@@ -469,20 +443,6 @@
         select:focus {
             outline: none;
             border-color: #667eea;
-        }
-
-        .toggle-btn {
-            padding: 4px 10px;
-            font-size: 0.8rem;
-            background: #3d3d5c;
-            border: none;
-            border-radius: 4px;
-            color: #e0e0e0;
-            cursor: pointer;
-        }
-
-        .toggle-btn.enabled {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
 
         .hidden {
@@ -657,8 +617,21 @@
                 <span class="summary-stat">Monitors: <strong id="monitorCount">0</strong></span>
                 <span class="summary-stat">Total Affected: <strong id="totalAffected">0</strong></span>
                 <span class="summary-stat">Total Duration: <strong id="totalDuration">-</strong></span>
+                <span class="summary-stat" id="lastChecked"></span>
+                <span class="summary-stat countdown" id="nextRefresh"></span>
             </div>
             <div class="summary-actions">
+                <select id="refreshInterval" title="Auto-refresh interval">
+                    <option value="0">Off</option>
+                    <option value="60000">1 min</option>
+                    <option value="300000" selected>5 min</option>
+                    <option value="600000">10 min</option>
+                    <option value="900000">15 min</option>
+                    <option value="1800000">30 min</option>
+                    <option value="3600000">60 min</option>
+                </select>
+                <button class="icon-btn" id="notifyBtn" onclick="toggleNotifications()" title="Toggle notifications (N)">Notify</button>
+                <button class="icon-btn" id="soundBtn" onclick="toggleSound()" title="Toggle sound alerts">Sound</button>
                 <button class="icon-btn" onclick="copyURL()" title="Copy shareable URL (C)">Copy</button>
                 <button class="icon-btn" id="compactBtn" onclick="toggleCompactView()" title="Toggle compact view">Compact</button>
                 <button class="icon-btn" id="sortBtn" onclick="toggleSort()" title="Sort assigned first">Sort</button>
@@ -674,33 +647,6 @@
         <div class="monitors" id="monitors"></div>
 
         <button class="add-monitor-btn" onclick="addMonitor()">+ Add Monitor</button>
-
-        <div class="meta">
-            <div class="countdown" id="countdownContainer">
-                <span id="lastChecked"></span>
-                <span id="nextRefresh"></span>
-            </div>
-            <div class="options">
-                <div class="option-group">
-                    <label for="refreshInterval">Refresh:</label>
-                    <select id="refreshInterval">
-                        <option value="0">Off</option>
-                        <option value="60000">1 min</option>
-                        <option value="300000" selected>5 min</option>
-                        <option value="600000">10 min</option>
-                        <option value="900000">15 min</option>
-                        <option value="1800000">30 min</option>
-                        <option value="3600000">60 min</option>
-                    </select>
-                </div>
-                <button id="notifyBtn" class="toggle-btn" onclick="toggleNotifications()">
-                    Notifications: Off
-                </button>
-                <button id="soundBtn" class="toggle-btn" onclick="toggleSound()">
-                    Sound: Off
-                </button>
-            </div>
-        </div>
 
         <footer>
             <a href="https://github.com/NeckBeardPrince/nes-outage-status-checker" target="_blank">GitHub</a>
@@ -807,8 +753,7 @@
         function updateSettingsUI() {
             document.getElementById('compactBtn').classList.toggle('active', compactView);
             document.getElementById('sortBtn').classList.toggle('active', sortByStatus);
-            document.getElementById('soundBtn').textContent = `Sound: ${soundEnabled ? 'On' : 'Off'}`;
-            document.getElementById('soundBtn').classList.toggle('enabled', soundEnabled);
+            document.getElementById('soundBtn').classList.toggle('active', soundEnabled);
             document.getElementById('themeBtn').textContent = lightMode ? 'Dark' : 'Light';
             document.getElementById('themeBtn').classList.toggle('active', lightMode);
             document.getElementById('colorblindBtn').classList.toggle('active', colorblindMode);
@@ -1182,8 +1127,7 @@
 
             if (notificationsEnabled) {
                 notificationsEnabled = false;
-                btn.textContent = 'Notifications: Off';
-                btn.classList.remove('enabled');
+                btn.classList.remove('active');
                 return;
             }
 
@@ -1207,15 +1151,13 @@
         function enableNotifications() {
             notificationsEnabled = true;
             const btn = document.getElementById('notifyBtn');
-            btn.textContent = 'Notifications: On';
-            btn.classList.add('enabled');
+            btn.classList.add('active');
         }
 
         function toggleSound() {
             soundEnabled = !soundEnabled;
             const btn = document.getElementById('soundBtn');
-            btn.textContent = `Sound: ${soundEnabled ? 'On' : 'Off'}`;
-            btn.classList.toggle('enabled', soundEnabled);
+            btn.classList.toggle('active', soundEnabled);
             saveSettings();
             // Play test sound when enabling
             if (soundEnabled) {
