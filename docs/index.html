@@ -773,6 +773,233 @@
         .modal-btn-primary:hover {
             opacity: 0.9;
         }
+
+        /* Address Lookup Styles */
+        .address-lookup-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-top: 8px;
+            transition: opacity 0.2s;
+        }
+
+        .address-lookup-btn:hover {
+            opacity: 0.9;
+        }
+
+        .instructions-main {
+            margin-bottom: 4px;
+        }
+
+        .address-lookup {
+            margin-top: 12px;
+            padding: 16px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        .address-lookup input[type="text"] {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.95rem;
+            margin-bottom: 10px;
+        }
+
+        .address-lookup input[type="text"]:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .address-lookup-actions {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .address-lookup-actions button {
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .address-lookup-actions .search-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .address-lookup-actions .search-btn:hover {
+            opacity: 0.9;
+        }
+
+        .address-lookup-actions .search-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .address-lookup-actions .cancel-btn {
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+        }
+
+        .address-lookup-actions .cancel-btn:hover {
+            background: var(--border-color);
+        }
+
+        .address-loading {
+            text-align: center;
+            padding: 12px;
+            color: var(--text-secondary);
+        }
+
+        .address-error {
+            color: var(--danger);
+            padding: 12px;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .address-results {
+            margin-top: 12px;
+        }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+
+        .results-help {
+            color: var(--accent);
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .results-help:hover {
+            text-decoration: underline;
+        }
+
+        .address-result {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .address-result:hover {
+            border-color: var(--accent);
+            background: var(--bg-tertiary);
+        }
+
+        .result-rank {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            width: 30px;
+            text-align: center;
+        }
+
+        .result-details {
+            flex: 1;
+        }
+
+        .result-event {
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+
+        .result-meta {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+
+        .result-status {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-top: 4px;
+            display: inline-block;
+        }
+
+        .result-status.status-assigned {
+            background: rgba(46, 213, 115, 0.2);
+            color: #2ed573;
+        }
+
+        .result-status.status-unassigned {
+            background: rgba(255, 107, 107, 0.2);
+            color: #ff6b6b;
+        }
+
+        .result-confidence {
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+        }
+
+        .result-confidence.best {
+            background: rgba(46, 213, 115, 0.2);
+            color: #2ed573;
+        }
+
+        .result-confidence.good {
+            background: rgba(255, 165, 2, 0.2);
+            color: #ffa502;
+        }
+
+        .result-confidence.possible {
+            background: rgba(102, 126, 234, 0.2);
+            color: #667eea;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .privacy-note {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 8px;
+            text-align: center;
+        }
+
+        /* Help Modal Specific */
+        .lookup-help-modal .modal-body ol,
+        .lookup-help-modal .modal-body ul {
+            padding-left: 24px;
+        }
+
+        .lookup-help-modal .modal-body li {
+            margin-bottom: 8px;
+        }
     </style>
 </head>
 <body>
@@ -865,6 +1092,40 @@
             </div>
             <div class="modal-footer">
                 <button class="modal-btn modal-btn-primary" onclick="closeChangelog()">Got it!</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay hidden" id="lookupHelpModal" onclick="closeLookupHelp(event)">
+        <div class="modal lookup-help-modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">How Address Lookup Works</div>
+                <button class="modal-close" onclick="closeLookupHelp()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>We convert your address to coordinates, then find nearby outage events using a weighted algorithm that considers both distance and outage size.</p>
+
+                <h4>The Process</h4>
+                <ol>
+                    <li><strong>Geocoding:</strong> Convert your address to GPS coordinates using OpenStreetMap</li>
+                    <li><strong>Distance calculation:</strong> Find all outages within 0.6 miles of your location</li>
+                    <li><strong>Smart ranking:</strong> Weight by both distance AND outage size (larger outages affecting more customers cover wider areas)</li>
+                </ol>
+
+                <h4>Why might it be wrong?</h4>
+                <ul>
+                    <li>Two neighbors can be on different electrical equipment and have different outages</li>
+                    <li>Outage boundaries don't follow street lines</li>
+                    <li>Multiple small outages may be near you</li>
+                </ul>
+
+                <h4>Accuracy</h4>
+                <p>~85-95% for the top suggestion. We show you the top 3 matches so you can confirm which one is yours.</p>
+
+                <p><strong>Tip:</strong> If the top result doesn't match what you see on the NES map, try #2 or #3, or verify on the <a href="https://nespower.com/outages" target="_blank">NES Outage Map</a>.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn modal-btn-primary" onclick="closeLookupHelp()">Got it!</button>
             </div>
         </div>
     </div>
@@ -1113,7 +1374,33 @@
                         <button onclick="checkSingleMonitor(${id})">Check</button>
                     </div>
                     <div class="instructions" id="instructions-${id}">
-                        Find your Event ID on the <a href="https://www.nespower.com/outages/" target="_blank">NES Outage Map</a>
+                        <div class="instructions-main">
+                            Know your Event ID? Enter it above. Or:
+                        </div>
+                        <button class="address-lookup-btn" onclick="showAddressLookup(${id})">
+                            Find by Address
+                        </button>
+                    </div>
+                    <div class="address-lookup hidden" id="addressLookup-${id}">
+                        <input type="text" id="addressInput-${id}"
+                               placeholder="Enter address (e.g., 123 Main St Nashville TN)"
+                               onkeypress="handleAddressKeypress(event, ${id})">
+                        <div class="address-lookup-actions">
+                            <button class="search-btn" onclick="lookupAddress(${id})" id="searchBtn-${id}">Search</button>
+                            <button class="cancel-btn" onclick="hideAddressLookup(${id})">Cancel</button>
+                        </div>
+                        <div class="address-loading hidden" id="addressLoading-${id}">
+                            <span class="spinner"></span> Searching for nearby outages...
+                        </div>
+                        <div class="address-error hidden" id="addressError-${id}"></div>
+                        <div class="address-results hidden" id="addressResults-${id}">
+                            <div class="results-header">
+                                <strong>Outages near your address:</strong>
+                                <span class="results-help" onclick="showLookupHelp()">How does this work?</span>
+                            </div>
+                            <div id="addressResultsList-${id}"></div>
+                        </div>
+                        <div class="privacy-note">Your address is sent to OpenStreetMap for geocoding only</div>
                     </div>
                     <div class="loading hidden" id="loading-${id}">
                         <span class="spinner"></span> Fetching...
@@ -1229,6 +1516,204 @@
 
         function handleKeypress(e, id) {
             if (e.key === 'Enter') checkSingleMonitor(id);
+        }
+
+        function handleAddressKeypress(e, id) {
+            if (e.key === 'Enter') lookupAddress(id);
+        }
+
+        // Address Lookup Functions
+        function showAddressLookup(id) {
+            document.getElementById(`instructions-${id}`).classList.add('hidden');
+            document.getElementById(`addressLookup-${id}`).classList.remove('hidden');
+            document.getElementById(`addressInput-${id}`).focus();
+        }
+
+        function hideAddressLookup(id) {
+            document.getElementById(`addressLookup-${id}`).classList.add('hidden');
+            document.getElementById(`instructions-${id}`).classList.remove('hidden');
+            document.getElementById(`addressError-${id}`).classList.add('hidden');
+            document.getElementById(`addressResults-${id}`).classList.add('hidden');
+            document.getElementById(`addressLoading-${id}`).classList.add('hidden');
+        }
+
+        function showLookupHelp() {
+            document.getElementById('lookupHelpModal').classList.remove('hidden');
+        }
+
+        function closeLookupHelp(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('lookupHelpModal').classList.add('hidden');
+        }
+
+        // Haversine distance formula - returns distance in miles
+        function haversine(lat1, lon1, lat2, lon2) {
+            const R = 3959; // Earth radius in miles
+            const dLat = toRad(lat2 - lat1);
+            const dLon = toRad(lon2 - lon1);
+            const a = Math.sin(dLat / 2) ** 2 +
+                      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+            return R * 2 * Math.asin(Math.sqrt(a));
+        }
+
+        function toRad(deg) {
+            return deg * (Math.PI / 180);
+        }
+
+        // Weighted score: lower = better match
+        // Balances distance with customer count (larger outages have larger radius)
+        function calculateScore(distance, numPeople) {
+            const customerWeight = 1 / Math.log(numPeople + 2);
+            return distance * customerWeight;
+        }
+
+        async function geocodeAddress(address) {
+            const encodedAddress = encodeURIComponent(address);
+            const url = `https://nominatim.openstreetmap.org/search?q=${encodedAddress}&format=json&limit=1`;
+
+            const response = await fetch(url, {
+                headers: {
+                    'User-Agent': 'NES-Outage-Checker/1.0 (https://nes-outage-checker.com)'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Geocoding service unavailable');
+            }
+
+            const data = await response.json();
+            if (!data || data.length === 0) {
+                throw new Error('Address not found. Try including city and state.');
+            }
+
+            return {
+                lat: parseFloat(data[0].lat),
+                lon: parseFloat(data[0].lon),
+                displayName: data[0].display_name
+            };
+        }
+
+        function findNearbyOutages(lat, lon, events) {
+            const MAX_DISTANCE = 0.6; // miles
+            const results = [];
+
+            for (const event of events) {
+                // Events have latitude/longitude in their data
+                if (event.latitude && event.longitude) {
+                    const distance = haversine(lat, lon, event.latitude, event.longitude);
+                    if (distance <= MAX_DISTANCE) {
+                        const score = calculateScore(distance, event.numPeople);
+                        results.push({
+                            event,
+                            distance,
+                            score
+                        });
+                    }
+                }
+            }
+
+            // Sort by score (lower is better)
+            results.sort((a, b) => a.score - b.score);
+
+            // Return top 3
+            return results.slice(0, 3);
+        }
+
+        function displayAddressResults(id, results) {
+            const resultsContainer = document.getElementById(`addressResultsList-${id}`);
+            const resultsSection = document.getElementById(`addressResults-${id}`);
+
+            if (results.length === 0) {
+                resultsContainer.innerHTML = `
+                    <div class="no-results">
+                        No outages found within 0.6 miles of your address.
+                        <br><br>
+                        This could mean:
+                        <ul style="text-align: left; margin-top: 8px;">
+                            <li>You don't have an outage in your area</li>
+                            <li>The address wasn't geocoded accurately</li>
+                            <li>The outage data hasn't been updated yet</li>
+                        </ul>
+                    </div>
+                `;
+                resultsSection.classList.remove('hidden');
+                return;
+            }
+
+            const confidenceLabels = ['Best Match', 'Good Match', 'Possible'];
+            const confidenceClasses = ['best', 'good', 'possible'];
+
+            resultsContainer.innerHTML = results.map((r, index) => {
+                const statusClass = r.event.status === 'Unassigned' ? 'status-unassigned' : 'status-assigned';
+                const statusText = r.event.status === 'Unassigned' ? 'Unassigned' : r.event.status;
+                const distanceStr = r.distance < 0.1 ? '< 0.1' : r.distance.toFixed(2);
+
+                return `
+                    <div class="address-result" onclick="selectEvent(${id}, ${r.event.id})">
+                        <div class="result-rank">#${index + 1}</div>
+                        <div class="result-details">
+                            <div class="result-event">Event ${r.event.id}</div>
+                            <div class="result-meta">${r.event.numPeople} customers · ${distanceStr} mi away</div>
+                            <div class="result-status ${statusClass}">${statusText}</div>
+                        </div>
+                        <div class="result-confidence ${confidenceClasses[index]}">${confidenceLabels[index]}</div>
+                    </div>
+                `;
+            }).join('');
+
+            resultsSection.classList.remove('hidden');
+        }
+
+        async function lookupAddress(id) {
+            const addressInput = document.getElementById(`addressInput-${id}`);
+            const address = addressInput.value.trim();
+
+            if (!address) {
+                document.getElementById(`addressError-${id}`).textContent = 'Please enter an address';
+                document.getElementById(`addressError-${id}`).classList.remove('hidden');
+                return;
+            }
+
+            // Show loading, hide errors/results
+            document.getElementById(`addressLoading-${id}`).classList.remove('hidden');
+            document.getElementById(`addressError-${id}`).classList.add('hidden');
+            document.getElementById(`addressResults-${id}`).classList.add('hidden');
+            document.getElementById(`searchBtn-${id}`).disabled = true;
+
+            try {
+                // Step 1: Geocode the address
+                const location = await geocodeAddress(address);
+
+                // Step 2: Fetch current outages
+                const response = await fetch(API_URL);
+                if (!response.ok) throw new Error('Failed to fetch outage data');
+                const events = await response.json();
+
+                // Step 3: Find nearby outages
+                const results = findNearbyOutages(location.lat, location.lon, events);
+
+                // Step 4: Display results
+                document.getElementById(`addressLoading-${id}`).classList.add('hidden');
+                displayAddressResults(id, results);
+
+            } catch (err) {
+                document.getElementById(`addressLoading-${id}`).classList.add('hidden');
+                document.getElementById(`addressError-${id}`).textContent = err.message;
+                document.getElementById(`addressError-${id}`).classList.remove('hidden');
+            } finally {
+                document.getElementById(`searchBtn-${id}`).disabled = false;
+            }
+        }
+
+        function selectEvent(monitorId, eventId) {
+            // Set the event ID in the input
+            document.getElementById(`eventId-${monitorId}`).value = eventId;
+
+            // Hide the address lookup
+            document.getElementById(`addressLookup-${monitorId}`).classList.add('hidden');
+
+            // Check the monitor
+            checkSingleMonitor(monitorId);
         }
 
         // Drag and drop functionality
@@ -1661,7 +2146,7 @@
         }
 
         // Version check
-        const APP_VERSION = '1.4.0';
+        const APP_VERSION = '1.5.0';
         const SEEN_VERSION_KEY = 'nes-outage-seen-version';
 
         function parseChangelog(markdown, version) {
