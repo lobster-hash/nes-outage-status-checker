@@ -556,7 +556,11 @@
                 <button class="icon-btn" id="notifyBtn" onclick="toggleNotifications()" title="Toggle notifications (N)">Notify</button>
                 <button class="icon-btn" id="soundBtn" onclick="toggleSound()" title="Toggle sound alerts">Sound</button>
                 <button class="icon-btn" id="compactBtn" onclick="toggleCompactView()" title="Toggle compact view">Compact</button>
-                <button class="icon-btn active" id="sortBtn" onclick="toggleSort()" title="Sort assigned first">Sort</button>
+                <select id="sortBy" onchange="applySort()" title="Sort by">
+                    <option value="status">Sort: Status</option>
+                    <option value="duration">Sort: Oldest</option>
+                    <option value="affected">Sort: Most Affected</option>
+                </select>
                 <button class="icon-btn" id="themeBtn" onclick="toggleTheme()" title="Toggle light/dark mode (T)">Light</button>
                 <button class="icon-btn" id="colorblindBtn" onclick="toggleColorblind()" title="Toggle colorblind mode">A11y</button>
             </div>
@@ -611,7 +615,7 @@
         let notificationsEnabled = false;
         let soundEnabled = false;
         let compactView = false;
-        let sortByStatus = true;
+        let sortBy = 'status';
         let lightMode = false;
         let colorblindMode = false;
         let previousEvents = {};
@@ -645,7 +649,7 @@
         function saveSettings() {
             localStorage.setItem(SETTINGS_KEY, JSON.stringify({
                 compactView,
-                sortByStatus,
+                sortBy,
                 soundEnabled,
                 lightMode,
                 colorblindMode
@@ -658,7 +662,7 @@
                 if (data) {
                     const settings = JSON.parse(data);
                     compactView = settings.compactView || false;
-                    sortByStatus = settings.sortByStatus !== false;
+                    sortBy = settings.sortBy || 'status';
                     soundEnabled = settings.soundEnabled || false;
                     lightMode = settings.lightMode || false;
                     colorblindMode = settings.colorblindMode || false;
@@ -669,7 +673,7 @@
 
         function updateSettingsUI() {
             document.getElementById('compactBtn').classList.toggle('active', compactView);
-            document.getElementById('sortBtn').classList.toggle('active', sortByStatus);
+            document.getElementById('sortBy').value = sortBy;
             document.getElementById('soundBtn').classList.toggle('active', soundEnabled);
             document.getElementById('themeBtn').textContent = lightMode ? 'Dark' : 'Light';
             document.getElementById('themeBtn').classList.toggle('active', lightMode);
@@ -895,15 +899,22 @@
                     events = events.filter(e => e.numPeople >= minAffected);
                 }
 
-                // Sort: Assigned first when enabled
-                if (sortByStatus) {
+                // Apply sorting
+                if (sortBy === 'status') {
+                    // Assigned first, then by affected
                     events.sort((a, b) => {
                         const aAssigned = a.status !== 'Unassigned';
                         const bAssigned = b.status !== 'Unassigned';
                         if (aAssigned && !bAssigned) return -1;
                         if (!aAssigned && bAssigned) return 1;
-                        return b.numPeople - a.numPeople; // Secondary sort by affected
+                        return b.numPeople - a.numPeople;
                     });
+                } else if (sortBy === 'duration') {
+                    // Oldest first (smallest startTime)
+                    events.sort((a, b) => a.startTime - b.startTime);
+                } else if (sortBy === 'affected') {
+                    // Most affected first
+                    events.sort((a, b) => b.numPeople - a.numPeople);
                 }
 
                 // Store events for map
@@ -1004,9 +1015,8 @@
             saveSettings();
         }
 
-        function toggleSort() {
-            sortByStatus = !sortByStatus;
-            document.getElementById('sortBtn').classList.toggle('active', sortByStatus);
+        function applySort() {
+            sortBy = document.getElementById('sortBy').value;
             saveSettings();
             fetchAllEvents();
         }
