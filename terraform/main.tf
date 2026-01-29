@@ -287,9 +287,15 @@ resource "aws_apigatewayv2_integration" "health" {
   payload_format_version = "2.0"
 }
 
-resource "aws_apigatewayv2_route" "health" {
+resource "aws_apigatewayv2_route" "health_get" {
   api_id    = aws_apigatewayv2_api.health.id
   route_key = "GET /health"
+  target    = "integrations/${aws_apigatewayv2_integration.health.id}"
+}
+
+resource "aws_apigatewayv2_route" "health_head" {
+  api_id    = aws_apigatewayv2_api.health.id
+  route_key = "HEAD /health"
   target    = "integrations/${aws_apigatewayv2_integration.health.id}"
 }
 
