@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: NES Outage Data Archiver - Fetches and stores outage data every 10 minutes
+
+Parameters:
+  BucketName:
+    Type: String
+    Default: nes-outage-archive
+    Description: S3 bucket name for storing archived data
+
+Resources:
+  # S3 Bucket for storing archived data
+  ArchiveBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldData
+            Status: Enabled
+            ExpirationInDays: 90  # Keep data for 90 days
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  # Lambda function
+  ArchiverFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: nes-outage-archiver
+      Runtime: python3.11
+      Handler: nes_archiver.lambda_handler
+      CodeUri: .
+      Timeout: 30
+      MemorySize: 128
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref BucketName
+      Policies:
+        - S3WritePolicy:
+            BucketName: !Ref BucketName
+      Events:
+        ScheduleEvent:
+          Type: Schedule
+          Properties:
+            Schedule: rate(10 minutes)
+            Description: Fetch NES outage data every 10 minutes
+            Enabled: true
+
+Outputs:
+  BucketName:
+    Description: S3 bucket for archived data
+    Value: !Ref ArchiveBucket
+  FunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt ArchiverFunction.Arn
