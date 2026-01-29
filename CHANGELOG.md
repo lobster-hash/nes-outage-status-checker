@@ -2,6 +2,20 @@
 
 All notable changes to the NES Outage Status Checker will be documented in this file.
 
+## [1.4.0] - 2026-01-29
+
+### Added
+
+#### Web App - Both Pages
+- **What's New modal** - Popup showing changelog when app updates to a new version
+- **Status filter** - Filter events by All, Assigned, or Unassigned status
+
+#### Web App - All Outages Page
+- **Sort options** - Sort by Status (assigned first), Oldest (longest duration), or Most Affected
+- **Higher filter thresholds** - Added 250+, 500+, 750+, and 1000+ affected filters
+
+---
+
 ## [1.3.0] - 2026-01-29
 
 ### Added
