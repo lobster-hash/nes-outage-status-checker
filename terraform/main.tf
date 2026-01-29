@@ -1,6 +1,13 @@
 terraform {
   required_version = ">= 1.0"
 
+  backend "s3" {
+    bucket  = "astracen-terraform-state"
+    key     = "nes-outage-status-checker/terraform.tfstate"
+    region  = "us-east-2"
+    profile = "personal"
+  }
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
