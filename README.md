@@ -2,6 +2,10 @@
 
 A terminal UI app to track Nashville Electric Service (NES) power outage repair status. Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea) and [Lip Gloss](https://github.com/charmbracelet/lipgloss).
 
+## My award
+
+<img alt="Now I'm autistic?" src="./images/award.png" />
+
 ## Notice
 
 This isn't an officially sanctioned app, and NES or their data provider might revoke or block this access. Though it's just using public data, so I don't see why they would.
@@ -26,7 +30,7 @@ During outages, the NES outage map shows affected areas but doesn't clearly indi
 2. Open your browsers Dev Tools
 3. Click on your outage marker on the map
 4. Get event id.
-<img width="3840" height="748" alt="How tf do I get the eventId?" src="./images/eventId.png" />
+   <img width="3840" height="748" alt="How tf do I get the eventId?" src="./images/eventId.png" />
 
 ## CLI Installation
 
@@ -50,6 +54,7 @@ go build -o nes-outage-status-checker
 ```
 
 Example:
+
 ```bash
 ./nes-outage-status-checker 1971637
 ```
@@ -57,6 +62,7 @@ Example:
 ## API
 
 This tool uses the public NES outage API:
+
 ```
 https://utilisocial.io/datacapable/v2/p/NES/map/events
 ```
