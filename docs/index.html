@@ -1558,7 +1558,6 @@
     <div class="nes-warning-banner" id="nesWarningBanner">
         NES appears to have stopped updating outage status information. "Assigned/Unassigned" status may no longer be accurate.
         <div class="subtext">Crew assignment data shown below may be outdated or incorrect.</div>
-        <button class="dismiss" onclick="dismissNesWarningBanner()" title="Dismiss">&times;</button>
     </div>
 
     <div class="container">
@@ -3185,11 +3184,6 @@
             localStorage.setItem('nes-domain-banner-dismissed', 'true');
         }
 
-        function dismissNesWarningBanner() {
-            document.getElementById('nesWarningBanner').style.display = 'none';
-            localStorage.setItem('nes-warning-banner-dismissed', 'true');
-        }
-
         (function() {
             const isNewDomain = window.location.hostname === 'nes-outage-checker.com' ||
                                window.location.hostname === 'www.nes-outage-checker.com';
@@ -3197,12 +3191,6 @@
 
             if (isNewDomain || isDismissed) {
                 document.getElementById('domainBanner').style.display = 'none';
-            }
-
-            // Check if NES warning banner was dismissed
-            const isWarningDismissed = localStorage.getItem('nes-warning-banner-dismissed') === 'true';
-            if (isWarningDismissed) {
-                document.getElementById('nesWarningBanner').style.display = 'none';
             }
         })();
 
