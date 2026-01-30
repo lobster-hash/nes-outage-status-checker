@@ -920,8 +920,8 @@
                     <strong id="totalCount">0</strong>
                 </span>
                 <span class="summary-stat unassigned" style="opacity: 0.7;">
-                    <span class="summary-stat-label">Waiting for Crew</span>
-                    <strong id="unassignedCount">0</strong>
+                    <span class="summary-stat-label">Affected Customers</span>
+                    <strong id="totalCustomersAffected">0</strong>
                 </span>
                 <span class="summary-stat" id="lastChecked"></span>
                 <span class="summary-stat countdown" id="nextRefresh"></span>
@@ -1233,14 +1233,13 @@
             // Use allEvents for overall stats (unfiltered by status dropdown)
             const eventsToCount = allEvents || events;
             const assignedEvents = eventsToCount.filter(e => e.status !== 'Unassigned');
-            const unassignedEvents = eventsToCount.filter(e => e.status === 'Unassigned');
 
             const assigned = assignedEvents.length;
-            const unassigned = unassignedEvents.length;
+            const totalCustomersAffected = eventsToCount.reduce((sum, e) => sum + (e.numPeople || 0), 0);
             const assignedAffected = assignedEvents.reduce((sum, e) => sum + (e.numPeople || 0), 0);
 
             document.getElementById('totalCount').textContent = eventsToCount.length;
-            document.getElementById('unassignedCount').textContent = unassigned;
+            document.getElementById('totalCustomersAffected').textContent = totalCustomersAffected.toLocaleString();
             document.getElementById('assignedCount').textContent = assigned;
             document.getElementById('assignedAffected').textContent = assignedAffected.toLocaleString();
         }
