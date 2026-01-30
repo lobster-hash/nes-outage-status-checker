@@ -4,6 +4,8 @@ All notable changes to the NES Outage Status Checker will be documented in this 
 
 ## [1.8.0] - 2026-01-30
 
+*Thank you to [coleman8er](https://github.com/coleman8er) for [PR #7](https://github.com/NeckBeardPrince/nes-outage-status-checker/pull/7)!*
+
 ### Added
 
 #### Web App - Both Pages
