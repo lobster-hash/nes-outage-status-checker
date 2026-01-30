@@ -907,6 +907,38 @@
             box-shadow: 0 4px 12px rgba(249, 115, 22, 0.25);
         }
 
+        .history-item {
+            padding: 10px 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-size: 0.875rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .history-item.new {
+            background: rgba(16, 185, 129, 0.1);
+            border-left: 3px solid var(--status-active);
+        }
+        .history-item.resolved {
+            background: rgba(107, 114, 128, 0.1);
+            border-left: 3px solid #6b7280;
+        }
+        .history-item.status-change {
+            background: rgba(249, 115, 22, 0.1);
+            border-left: 3px solid var(--accent);
+        }
+        .history-time {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+        .history-empty {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-muted);
+        }
+
         #map {
             height: 600px;
             border-radius: 0 0 12px 12px;
@@ -1243,6 +1275,7 @@
                 <button class="icon-btn" id="notifyBtn" onclick="toggleNotifications()" title="Toggle notifications (N)">Notify</button>
                 <button class="icon-btn" id="soundBtn" onclick="toggleSound()" title="Toggle sound alerts">Sound</button>
                 <button class="icon-btn" id="compactBtn" onclick="toggleCompactView()" title="Toggle compact view">Compact</button>
+                <button class="icon-btn" id="historyBtn" onclick="toggleHistoryModal()" title="View change history (H)">History</button>
                 <select id="sortBy" onchange="applySort()" title="Sort by">
                     <option value="status">Sort: Status</option>
                     <option value="duration">Sort: Oldest</option>
@@ -1296,7 +1329,7 @@
             <a href="https://github.com/NeckBeardPrince/nes-outage-status-checker" target="_blank">GitHub</a>
             &middot;
             <a href="https://github.com/NeckBeardPrince/nes-outage-status-checker/blob/main/CHANGELOG.md" target="_blank">Changelog</a>
-            <div class="keyboard-hint">Keyboard: R=Refresh, N=Notify, T=Theme, M=Map, S=Style, F=Fullscreen</div>
+            <div class="keyboard-hint">Keyboard: R=Refresh, N=Notify, T=Theme, M=Map, S=Style, F=Fullscreen, H=History</div>
             <div class="built-with">
                 Built by <a href="https://iamadam.dev/" target="_blank" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-decoration: none; font-weight: 700;">Adam</a>
                 <span style="margin: 0 6px; color: #666;">+</span>
@@ -1333,6 +1366,22 @@
         </div>
     </div>
 
+    <div class="modal-overlay hidden" id="historyModal" onclick="closeHistoryModal(event)">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">Change History</div>
+                <button class="modal-close" onclick="closeHistoryModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="historyContent">
+                <p style="color: var(--text-muted);">No changes recorded yet. History will appear after the first refresh.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn" onclick="clearHistory()" style="background: var(--bg-tertiary); color: var(--text-secondary);">Clear</button>
+                <button class="modal-btn modal-btn-primary" onclick="closeHistoryModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
     <div class="location-modal-overlay hidden" id="locationModal" onclick="closeLocationModal(event)">
         <div class="location-modal" onclick="event.stopPropagation()">
             <div class="location-modal-header">
@@ -1364,6 +1413,7 @@
         let lightMode = false;
         let colorblindMode = false;
         let previousEvents = {};
+        let changeHistory = [];
         let audioContext = null;
         let currentView = 'grid';
         let map = null;
@@ -1541,6 +1591,7 @@
                 case 'm': setView(currentView === 'map' ? 'grid' : 'map'); break;
                 case 's': cycleMapStyle(); break;
                 case 'f': if (currentView === 'map') toggleMapFullscreen(); break;
+                case 'h': toggleHistoryModal(); break;
             }
         });
 
@@ -1627,12 +1678,14 @@
             const changes = [];
             const currentIds = new Set(events.map(e => e.id));
             const previousIds = new Set(Object.keys(previousEvents).map(id => parseInt(id)));
+            const now = new Date();
 
-            // Count new events
+            // Count and record new events
             let newCount = 0;
             events.forEach(event => {
                 if (!previousIds.has(event.id)) {
                     newCount++;
+                    addToHistory('new', `New outage: ${event.title || 'Event ' + event.id} (${event.numPeople} affected)`, now);
                 }
             });
 
@@ -1646,6 +1699,7 @@
                         oldStatus: prev.status,
                         newStatus: event.status
                     });
+                    addToHistory('status-change', `${event.title || 'Event ' + event.id}: ${prev.status} → ${event.status}`, now);
                 }
             });
 
@@ -1654,6 +1708,7 @@
             Object.keys(previousEvents).forEach(id => {
                 if (!currentIds.has(parseInt(id))) {
                     resolvedCount++;
+                    addToHistory('resolved', `Event ${id} resolved or no longer active`, now);
                     sendNotification('NES Outage Update', `Event ${id}: No longer found - may be resolved!`);
                 }
             });
@@ -1675,6 +1730,46 @@
             events.forEach(e => {
                 previousEvents[e.id] = { status: e.status };
             });
+        }
+
+        function addToHistory(type, message, time) {
+            changeHistory.unshift({ type, message, time: time.toISOString() });
+            // Keep only last 50 entries
+            changeHistory = changeHistory.slice(0, 50);
+            updateHistoryDisplay();
+        }
+
+        function updateHistoryDisplay() {
+            const content = document.getElementById('historyContent');
+            if (!content) return;
+
+            if (changeHistory.length === 0) {
+                content.innerHTML = '<p class="history-empty">No changes recorded yet. History will appear after the first refresh.</p>';
+                return;
+            }
+
+            content.innerHTML = changeHistory.map(h => {
+                const time = new Date(h.time).toLocaleTimeString();
+                return `<div class="history-item ${h.type}">
+                    <span>${h.message}</span>
+                    <span class="history-time">${time}</span>
+                </div>`;
+            }).join('');
+        }
+
+        function toggleHistoryModal() {
+            const modal = document.getElementById('historyModal');
+            modal.classList.toggle('hidden');
+        }
+
+        function closeHistoryModal(event) {
+            if (event && event.target !== event.currentTarget) return;
+            document.getElementById('historyModal').classList.add('hidden');
+        }
+
+        function clearHistory() {
+            changeHistory = [];
+            updateHistoryDisplay();
         }
 
         function sendNotification(title, body) {
@@ -2209,7 +2304,7 @@
         }
 
         // Version check
-        const APP_VERSION = '1.8.0';
+        const APP_VERSION = '1.9.0';
         const SEEN_VERSION_KEY = 'nes-outage-seen-version';
 
         function parseChangelog(markdown, version) {

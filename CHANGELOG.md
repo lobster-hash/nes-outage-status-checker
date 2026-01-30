@@ -2,6 +2,19 @@
 
 All notable changes to the NES Outage Status Checker will be documented in this file.
 
+## [1.9.0] - 2026-01-30
+
+### Added
+
+#### Web App - All Outages Page
+- **Change History modal** - View a log of all changes including new outages, resolved outages, and status changes
+- **H keyboard shortcut** - Quick access to History modal
+
+#### Web App - Footer
+- **Community acknowledgment** - Added link to GitHub contributors page
+
+---
+
 ## [1.8.0] - 2026-01-30
 
 *Thank you to [coleman8er](https://github.com/coleman8er) for [PR #7](https://github.com/NeckBeardPrince/nes-outage-status-checker/pull/7)!*
