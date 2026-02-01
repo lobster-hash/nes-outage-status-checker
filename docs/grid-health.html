@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grid Health Dashboard - NES Outage Checker</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="shared-data.js"></script>
+    <style>
+        :root {
+            --font-display: 'DM Serif Display', Georgia, serif;
+            --font-body: 'Outfit', system-ui, sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+            --bg-primary: #1C1917;
+            --bg-secondary: #292524;
+            --bg-tertiary: #3D3936;
+            --text-primary: #FAFAF9;
+            --text-secondary: #A8A29E;
+            --status-active: #10B981;
+            --status-waiting: #F59E0B;
+            --accent: #F97316;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-body); }
+
+        header {
+            background: var(--bg-secondary);
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid rgba(168, 162, 158, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-left { display: flex; gap: 2rem; align-items: center; }
+        .nav-left h1 { font-family: var(--font-display); font-size: 1.8rem; color: var(--accent); }
+        .nav-links { display: flex; gap: 1.5rem; list-style: none; }
+        .nav-links a { text-decoration: none; color: var(--text-secondary); font-size: 0.95rem; transition: color 0.2s; }
+        .nav-links a:hover, .nav-links a.active { color: var(--accent); }
+
+        .container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid rgba(168, 162, 158, 0.1);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card h2 {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .card h3 {
+            font-size: 1.1rem;
+            margin: 1.5rem 0 1rem;
+            color: var(--text-primary);
+        }
+
+        .status-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(168, 162, 158, 0.1);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .status-badge.stable {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--status-active);
+        }
+
+        .status-badge.stressed {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--status-waiting);
+        }
+
+        .status-badge.critical {
+            background: rgba(239, 68, 68, 0.15);
+            color: #EF4444;
+        }
+
+        .gauge-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .gauge-card {
+            background: var(--bg-tertiary);
+            border: 1px solid rgba(168, 162, 158, 0.1);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .gauge-chart {
+            position: relative;
+            width: 100%;
+            height: 220px;
+            margin-bottom: 1rem;
+        }
+
+        .gauge-label {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .gauge-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .gauge-unit {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .gauge-status {
+            font-size: 0.8rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(168, 162, 158, 0.1);
+        }
+
+        .grid-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-box {
+            background: var(--bg-tertiary);
+            border: 1px solid rgba(168, 162, 158, 0.1);
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+
+        .metric-label {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--text-primary);
+        }
+
+        .metric-detail {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
+        }
+
+        .info-box {
+            background: rgba(16, 185, 129, 0.1);
+            border-left: 3px solid var(--status-active);
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .warning-box {
+            background: rgba(245, 158, 11, 0.1);
+            border-left: 3px solid var(--status-waiting);
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .alert-box {
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 3px solid #EF4444;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            color: #EF4444;
+        }
+
+        .trend-chart {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            margin-top: 1.5rem;
+        }
+
+        .update-time {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            text-align: right;
+            margin-top: 1rem;
+        }
+
+        .update-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: var(--status-active);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .recommendation {
+            background: var(--bg-tertiary);
+            border-left: 3px solid var(--accent);
+            padding: 1rem;
+            border-radius: 4px;
+            margin-top: 1rem;
+        }
+
+        .recommendation strong {
+            color: var(--accent);
+        }
+
+        @media (max-width: 768px) {
+            .gauge-container {
+                grid-template-columns: 1fr;
+            }
+
+            .status-header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+
+            body {
+                padding-bottom: 70px;
+            }
+
+            .mobile-bottom-nav {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: 70px;
+                background: var(--bg-secondary);
+                border-top: 1px solid rgba(168, 162, 158, 0.15);
+                display: flex;
+                justify-content: space-around;
+                align-items: center;
+                z-index: 99;
+                box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+            }
+
+            .mobile-nav-item {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 4px;
+                padding: 8px 12px;
+                color: var(--text-secondary);
+                text-decoration: none;
+                font-size: 10px;
+                font-weight: 500;
+                transition: all 0.2s;
+                cursor: pointer;
+                border-radius: 8px;
+                flex: 1;
+                height: 100%;
+            }
+
+            .mobile-nav-item:hover {
+                background: var(--bg-tertiary);
+                color: var(--accent);
+            }
+
+            .mobile-nav-item.active {
+                color: var(--accent);
+                background: rgba(249, 115, 22, 0.15);
+            }
+
+            .mobile-nav-item-icon {
+                font-size: 20px;
+            }
+        }
+
+        @media (min-width: 769px) {
+            .mobile-bottom-nav {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="nav-container">
+            <div class="nav-left">
+                <h1>⚡ NES Outage</h1>
+                <ul class="nav-links">
+                    <li><a href="index.html">Map</a></li>
+                    <li><a href="all.html">All Outages</a></li>
+                    <li><a href="stats.html">Analytics</a></li>
+                    <li><a href="feed.html">Live Feed</a></li>
+                    <li><a href="grid-health.html" class="active">Grid Health</a></li>
+                </ul>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Grid Status Overview -->
+        <div class="card">
+            <div class="status-header">
+                <div>
+                    <h2>⚡ Grid Health Dashboard</h2>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">Real-time power grid monitoring and predictive metrics</p>
+                </div>
+                <div id="gridStatusBadge" class="status-badge stable">✅ Grid: STABLE</div>
+            </div>
+
+            <div id="alertsContainer"></div>
+
+            <h3>Current Metrics</h3>
+            <div class="gauge-container" id="gaugeContainer">
+                <!-- Gauges will be rendered here -->
+            </div>
+
+            <div class="recommendation" id="recommendationBox">
+                <strong>💡 Recommendation:</strong> <span id="recommendationText">Grid operating normally</span>
+            </div>
+
+            <div class="update-time">
+                <span class="update-indicator"></span>
+                Last updated: <span id="updateTime">Just now</span> (updates every 30 seconds)
+            </div>
+        </div>
+
+        <!-- Additional Metrics -->
+        <div class="card">
+            <h2>📊 Grid Analysis</h2>
+
+            <div class="grid-metrics">
+                <div class="metric-box">
+                    <div class="metric-label">Grid Frequency</div>
+                    <div class="metric-value" id="freqValue">60.00</div>
+                    <div class="metric-detail">
+                        Normal: 59.9-60.1 Hz<br>
+                        <span id="freqStatus">✅</span> In range
+                    </div>
+                </div>
+
+                <div class="metric-box">
+                    <div class="metric-label">Voltage Level</div>
+                    <div class="metric-value" id="voltValue">239</div>
+                    <div class="metric-detail">
+                        Normal: 230-250 V<br>
+                        <span id="voltStatus">✅</span> In range
+                    </div>
+                </div>
+
+                <div class="metric-box">
+                    <div class="metric-label">Load Capacity</div>
+                    <div class="metric-value" id="loadValue">72</div>
+                    <div class="metric-detail">
+                        Green: <70%<br>
+                        Current: <span id="loadStatus">✅ Normal</span>
+                    </div>
+                </div>
+
+                <div class="metric-box">
+                    <div class="metric-label">Transformer Load</div>
+                    <div class="metric-value" id="transValue">68</div>
+                    <div class="metric-detail">
+                        Normal: <75%<br>
+                        <span id="transStatus">✅</span> Healthy
+                    </div>
+                </div>
+
+                <div class="metric-box">
+                    <div class="metric-label">Active Outages</div>
+                    <div class="metric-value" id="outagesValue">4</div>
+                    <div class="metric-detail">
+                        Ongoing incidents on grid<br>
+                        <span id="outagesTrend">→</span> Stable
+                    </div>
+                </div>
+
+                <div class="metric-box">
+                    <div class="metric-label">Grid Stability</div>
+                    <div class="metric-value" id="stabilityValue">92</div>
+                    <div class="metric-detail">
+                        Health score (0-100)<br>
+                        <span id="stabilityStatus">✅ Excellent</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 24-Hour Trend -->
+        <div class="card">
+            <h2>📈 24-Hour Trend Analysis</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.9rem;">Historical grid load distribution and frequency patterns</p>
+
+            <div class="trend-chart" id="trendChart">
+                <canvas id="trendCanvas"></canvas>
+            </div>
+        </div>
+
+        <!-- Grid Status Details -->
+        <div class="card">
+            <h2>ℹ️ Safe Operating Parameters</h2>
+
+            <div class="info-box">
+                The power grid operates within strict standards to ensure reliability and equipment protection. These ranges represent safe operating limits set by NERC (North American Electric Reliability Corporation).
+            </div>
+
+            <table style="width: 100%; margin-top: 1rem; border-collapse: collapse; font-size: 0.9rem;">
+                <thead>
+                    <tr style="border-bottom: 1px solid rgba(168, 162, 158, 0.2);">
+                        <th style="text-align: left; padding: 0.75rem; color: var(--accent);">Parameter</th>
+                        <th style="text-align: center; padding: 0.75rem; color: var(--text-secondary);">Safe Range</th>
+                        <th style="text-align: center; padding: 0.75rem; color: var(--text-secondary);">Alert Level</th>
+                        <th style="text-align: center; padding: 0.75rem; color: var(--text-secondary);">Critical</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="border-bottom: 1px solid rgba(168, 162, 158, 0.1);">
+                        <td style="padding: 0.75rem; font-weight: 500;">Frequency</td>
+                        <td style="text-align: center; padding: 0.75rem;">59.9-60.1 Hz</td>
+                        <td style="text-align: center; padding: 0.75rem; color: var(--status-waiting);">±0.15 Hz</td>
+                        <td style="text-align: center; padding: 0.75rem; color: #EF4444;">±0.2 Hz</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(168, 162, 158, 0.1);">
+                        <td style="padding: 0.75rem; font-weight: 500;">Voltage</td>
+                        <td style="text-align: center; padding: 0.75rem;">230-250 V</td>
+                        <td style="text-align: center; padding: 0.75rem; color: var(--status-waiting);">228-252 V</td>
+                        <td style="text-align: center; padding: 0.75rem; color: #EF4444;">220-260 V</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid rgba(168, 162, 158, 0.1);">
+                        <td style="padding: 0.75rem; font-weight: 500;">Load Capacity</td>
+                        <td style="text-align: center; padding: 0.75rem;"><70%</td>
+                        <td style="text-align: center; padding: 0.75rem; color: var(--status-waiting);">70-85%</td>
+                        <td style="text-align: center; padding: 0.75rem; color: #EF4444;">>85%</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.75rem; font-weight: 500;">Transformer Util.</td>
+                        <td style="text-align: center; padding: 0.75rem;"><75%</td>
+                        <td style="text-align: center; padding: 0.75rem; color: var(--status-waiting);">75-85%</td>
+                        <td style="text-align: center; padding: 0.75rem; color: #EF4444;">>85%</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- About Grid Health -->
+        <div class="card">
+            <h2>📚 About Grid Health Monitoring</h2>
+            <p style="color: var(--text-secondary); line-height: 1.6;">
+                Grid health metrics help predict potential outages and system stress. By monitoring frequency, voltage, and load in real-time, 
+                operators can implement preventive measures before cascading failures occur. High load periods (typically 2-8 PM) are 
+                when the grid is most vulnerable to outages.
+            </p>
+            <p style="color: var(--text-secondary); margin-top: 1rem; line-height: 1.6;">
+                <strong style="color: var(--accent);">💡 Did you know?</strong> Each 1% increase in load requires exponentially more reserves 
+                to maintain stability. At 85% load, a single large customer outage could trigger a cascading failure affecting thousands.
+            </p>
+        </div>
+    </div>
+
+    <script>
+        let gridStatusChart = null;
+        let trendChart = null;
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            updateGridStatus();
+            // Update every 30 seconds
+            setInterval(updateGridStatus, 30000);
+        });
+
+        function updateGridStatus() {
+            const status = generateGridHealthStatus();
+            renderGauges(status);
+            updateMetrics(status);
+            updateStatusBadge(status);
+            updateTrendChart(status.historicalTrend);
+            updateAlerts(status);
+            updateTime();
+        }
+
+        function renderGauges(status) {
+            const container = document.getElementById('gaugeContainer');
+            container.innerHTML = '';
+
+            const gauges = [
+                { label: 'Frequency', value: status.frequency, unit: 'Hz', min: 59.8, max: 60.2, current: status.frequency, low: 59.9, high: 60.1 },
+                { label: 'Voltage', value: status.voltage, unit: 'V', min: 220, max: 260, current: status.voltage, low: 230, high: 250 },
+                { label: 'Load %', value: status.loadPercentage, unit: '%', min: 0, max: 100, current: status.loadPercentage, low: 0, high: 70 },
+                { label: 'Transformer', value: status.transformerUtilization, unit: '%', min: 0, max: 100, current: status.transformerUtilization, low: 0, high: 75 }
+            ];
+
+            gauges.forEach((gauge, index) => {
+                const card = document.createElement('div');
+                card.className = 'gauge-card';
+
+                const chartId = `gaugeChart${index}`;
+                card.innerHTML = `
+                    <div class="gauge-label">${gauge.label}</div>
+                    <div class="gauge-chart">
+                        <canvas id="${chartId}"></canvas>
+                    </div>
+                    <div class="gauge-value">${gauge.value}</div>
+                    <div class="gauge-unit">${gauge.unit}</div>
+                    <div class="gauge-status" id="gaugeStatus${index}">Status: Loading...</div>
+                `;
+
+                container.appendChild(card);
+
+                setTimeout(() => {
+                    createGaugeChart(chartId, gauge);
+                    updateGaugeStatus(index, gauge);
+                }, 100);
+            });
+        }
+
+        function createGaugeChart(canvasId, gauge) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            const percentage = ((gauge.current - gauge.min) / (gauge.max - gauge.min)) * 100;
+
+            // Determine color based on value
+            let color;
+            if (gauge.current >= gauge.low && gauge.current <= gauge.high) {
+                color = '#10B981';  // Green
+            } else if (gauge.current > gauge.high && gauge.current <= gauge.high + (gauge.high - gauge.low)) {
+                color = '#F59E0B';  // Yellow
+            } else {
+                color = '#EF4444';  // Red
+            }
+
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [percentage, 100 - percentage],
+                        backgroundColor: [color, 'rgba(168, 162, 158, 0.2)'],
+                        borderColor: ['transparent', 'transparent'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        function updateGaugeStatus(index, gauge) {
+            const statusEl = document.getElementById(`gaugeStatus${index}`);
+            if (gauge.current >= gauge.low && gauge.current <= gauge.high) {
+                statusEl.innerHTML = '✅ Normal';
+                statusEl.style.color = '#10B981';
+            } else if (gauge.current > gauge.high && gauge.current <= gauge.high + (gauge.high - gauge.low)) {
+                statusEl.innerHTML = '⚠️ Warning';
+                statusEl.style.color = '#F59E0B';
+            } else {
+                statusEl.innerHTML = '🚨 Critical';
+                statusEl.style.color = '#EF4444';
+            }
+        }
+
+        function updateMetrics(status) {
+            document.getElementById('freqValue').textContent = status.frequency.toFixed(2);
+            document.getElementById('voltValue').textContent = status.voltage.toFixed(0);
+            document.getElementById('loadValue').textContent = status.loadPercentage;
+            document.getElementById('transValue').textContent = status.transformerUtilization;
+            document.getElementById('outagesValue').textContent = status.activeOutages;
+
+            // Calculate stability score
+            const stabilityScore = Math.round(100 - (
+                Math.abs(status.frequency - 60) * 100 +
+                Math.abs((status.voltage - 240) / 10) * 50 +
+                (status.loadPercentage / 100) * 100
+            ) / 3);
+
+            document.getElementById('stabilityValue').textContent = Math.max(0, Math.min(100, stabilityScore));
+
+            // Update status indicators
+            document.getElementById('freqStatus').textContent = status.frequency >= 59.9 && status.frequency <= 60.1 ? '✅' : '⚠️';
+            document.getElementById('voltStatus').textContent = status.voltage >= 230 && status.voltage <= 250 ? '✅' : '⚠️';
+            document.getElementById('loadStatus').textContent = status.loadPercentage < 70 ? '✅ Normal' : status.loadPercentage < 85 ? '⚠️ Warning' : '🚨 Critical';
+            document.getElementById('transStatus').textContent = status.transformerUtilization < 75 ? '✅' : '⚠️';
+            document.getElementById('stabilityStatus').textContent = stabilityScore > 80 ? '✅ Excellent' : stabilityScore > 60 ? '⚠️ Good' : '🚨 Poor';
+        }
+
+        function updateStatusBadge(status) {
+            const badge = document.getElementById('gridStatusBadge');
+            badge.className = 'status-badge ' + status.gridStatus.toLowerCase();
+            const statusIcon = status.gridStatus === 'STABLE' ? '✅' : status.gridStatus === 'STRESSED' ? '⚠️' : '🚨';
+            badge.textContent = `${statusIcon} Grid: ${status.gridStatus}`;
+
+            document.getElementById('recommendationText').textContent = status.recommendation;
+        }
+
+        function updateAlerts(status) {
+            const container = document.getElementById('alertsContainer');
+            if (status.alerts.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            container.innerHTML = status.alerts.map(alert => {
+                if (alert.includes('CRITICAL')) {
+                    return `<div class="alert-box">${alert}</div>`;
+                } else if (alert.includes('⚠️')) {
+                    return `<div class="warning-box">${alert}</div>`;
+                }
+                return '';
+            }).join('');
+        }
+
+        function updateTrendChart(historicalData) {
+            const ctx = document.getElementById('trendCanvas');
+            if (!ctx) return;
+
+            const times = historicalData.map(d => new Date(d.timestamp).toLocaleTimeString());
+            const loads = historicalData.map(d => d.loadPercentage);
+            const freqs = historicalData.map(d => (d.frequency - 59.8) * 50);  // Scale to 0-100
+
+            if (trendChart) {
+                trendChart.destroy();
+            }
+
+            trendChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: times,
+                    datasets: [
+                        {
+                            label: 'Load %',
+                            data: loads,
+                            borderColor: '#F97316',
+                            backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Frequency (Hz × 50)',
+                            data: freqs,
+                            borderColor: '#10B981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            tension: 0.4,
+                            fill: false,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            labels: { color: '#FAFAF9', font: { family: "'Outfit', sans-serif" } }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            ticks: { color: '#A8A29E' },
+                            grid: { color: 'rgba(168, 162, 158, 0.1)' },
+                            title: { display: true, text: 'Load %', color: '#FAFAF9' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            ticks: { color: '#A8A29E' },
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'Frequency', color: '#FAFAF9' }
+                        },
+                        x: {
+                            ticks: { color: '#A8A29E' },
+                            grid: { color: 'rgba(168, 162, 158, 0.1)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateTime() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString();
+            document.getElementById('updateTime').textContent = timeStr;
+        }
+
+        // Log for production setup
+        console.log('%c⚡ NES Grid Health Dashboard Ready', 'color: #F97316; font-size: 16px; font-weight: bold;');
+        console.log('%cProduction Integration:', 'color: #10B981; font-weight: bold;');
+        console.log('1. Connect generateGridHealthStatus() to real SCADA API');
+        console.log('2. Replace mock data with live grid measurements');
+        console.log('3. Implement WebSocket for real-time updates (currently 30s polling)');
+        console.log('4. Add historical data persistence for trend analysis');
+        console.log('\nData source: Mock generator (ready for real API integration)');
+    </script>
+
+    <!-- Mobile Bottom Navigation -->
+    <nav class="mobile-bottom-nav">
+        <a href="index.html" class="mobile-nav-item" title="Monitor">
+            <span class="mobile-nav-item-icon">🏠</span>
+            <span class="mobile-nav-item-label">Monitor</span>
+        </a>
+        <a href="all.html" class="mobile-nav-item" title="All Outages">
+            <span class="mobile-nav-item-icon">📊</span>
+            <span class="mobile-nav-item-label">Outages</span>
+        </a>
+        <a href="stats.html" class="mobile-nav-item" title="Statistics">
+            <span class="mobile-nav-item-icon">📈</span>
+            <span class="mobile-nav-item-label">Stats</span>
+        </a>
+        <a href="feed.html" class="mobile-nav-item" title="Feed">
+            <span class="mobile-nav-item-icon">🎮</span>
+            <span class="mobile-nav-item-label">Feed</span>
+        </a>
+        <a href="grid-health.html" class="mobile-nav-item active" title="Grid Health">
+            <span class="mobile-nav-item-icon">⚡</span>
+            <span class="mobile-nav-item-label">Grid</span>
+        </a>
+    </nav>
+
+    <!-- Command Palette and Geofence -->
+    <script src="command-palette.js"></script>
+    <script src="geofence.js"></script>
+</body>
+</html>
