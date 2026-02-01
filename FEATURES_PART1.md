@@ -107,3 +107,8 @@
 5. `feat: add neighborhood safety scorecard`
 
 All commits authored by: lobsterhash@gmail.com
+
+## Timeline Feature
+- Displays minute-by-minute incident progression
+- Accessible from outage details via "View Timeline" link
+- Mock timeline generation from event metadata
