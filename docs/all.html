@@ -2798,6 +2798,26 @@
                 <div class="popup-field"><strong>Duration:</strong> ${formatDuration(event.startTime)}</div>
             `;
             
+            // Add Severity Score Badge
+            const severityInfo = calculateSeverityScore(event);
+            popup += `
+                <div style="margin-top: 10px; padding: 10px; background: rgba(249, 115, 22, 0.1); border-radius: 6px; border-left: 3px solid ${severityInfo.color};">
+                    <strong style="color: ${severityInfo.color};">⚠️ Severity: ${severityInfo.badge}</strong><br>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">${severityInfo.reasoning}</span>
+                </div>
+            `;
+            
+            // Add Impact Calculator info
+            const durationHours = (Date.now() - new Date(event.startTime)) / (1000 * 60 * 60);
+            const impact = calculateOutageImpact(event.numPeople, durationHours, ['residential', 'retail']);
+            popup += `
+                <div style="margin-top: 10px; padding: 10px; background: rgba(16, 185, 129, 0.1); border-radius: 6px; border-left: 3px solid #10B981;">
+                    <strong style="color: #10B981;">💰 Economic Impact</strong><br>
+                    <span style="font-weight: 600; color: var(--text-primary);">${impact.formattedCost}</span><br>
+                    <span style="font-size: 0.75rem; color: var(--text-muted);">${impact.estimatedFamilies.toLocaleString()} families (~${impact.estimatedPeople.toLocaleString()} people)</span>
+                </div>
+            `;
+            
             // Add ETA if enabled
             if (showETA) {
                 const etaHours = estimateETA(event);
@@ -2822,6 +2842,13 @@
                     </div>
                 `;
             }
+            
+            // Add Timeline link
+            popup += `
+                <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color);">
+                    <a href="timeline.html?id=${event.id}" style="color: var(--accent); text-decoration: none; font-weight: 600; font-size: 0.85rem;">📅 View Timeline →</a>
+                </div>
+            `;
             
             const isAssigned = event.status !== 'Unassigned';
             popup += `<div class="popup-status ${isAssigned ? 'assigned' : 'unassigned'}">${event.status.toUpperCase()}</div>`;

@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Incident Timeline - NES Outage Status Checker</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="shared-data.js"></script>
+    <style>
+        :root {
+            --font-display: 'DM Serif Display', Georgia, serif;
+            --font-body: 'Outfit', system-ui, sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+
+            --bg-primary: #1C1917;
+            --bg-secondary: #292524;
+            --bg-tertiary: #3D3936;
+            --text-primary: #FAFAF9;
+            --text-secondary: #A8A29E;
+            --text-muted: #78716C;
+            --accent: #F97316;
+            --success: #10B981;
+            --danger: #EF4444;
+            --warning: #F59E0B;
+            --border-color: rgba(168, 162, 158, 0.15);
+            --shadow-md: 0 4px 12px rgba(28, 25, 23, 0.4);
+        }
+
+        body.light-mode {
+            --bg-primary: #FAFAF9;
+            --bg-secondary: #FFFFFF;
+            --bg-tertiary: #F5F5F4;
+            --text-primary: #1C1917;
+            --text-secondary: #57534E;
+            --text-muted: #A8A29E;
+            --border-color: rgba(28, 25, 23, 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-family: var(--font-display);
+            font-size: 2rem;
+        }
+
+        .back-btn {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 0.5rem 1.2rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: var(--font-body);
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+
+        .back-btn:hover {
+            background: var(--accent);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .timeline-header {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .timeline-header h2 {
+            margin: 0 0 0.5rem 0;
+            color: var(--text-primary);
+        }
+
+        .timeline-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1rem;
+        }
+
+        .meta-item {
+            padding: 0.75rem;
+            background: var(--bg-primary);
+            border-radius: 6px;
+            border-left: 3px solid var(--accent);
+        }
+
+        .meta-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.25rem;
+        }
+
+        .meta-value {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .timeline-container {
+            position: relative;
+            padding: 2rem 0;
+        }
+
+        /* Vertical timeline line */
+        .timeline-container::before {
+            content: '';
+            position: absolute;
+            left: 40px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(to bottom, var(--accent), var(--accent) 50%, transparent);
+        }
+
+        .timeline-item {
+            display: flex;
+            margin-bottom: 2rem;
+            position: relative;
+            scroll-margin-top: 100px;
+        }
+
+        .timeline-dot {
+            position: absolute;
+            left: 20px;
+            top: 20px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--bg-secondary);
+            border: 3px solid var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            z-index: 2;
+        }
+
+        .timeline-item.resolved .timeline-dot {
+            border-color: var(--success);
+        }
+
+        .timeline-item.updated .timeline-dot {
+            border-color: var(--warning);
+        }
+
+        .timeline-item.new .timeline-dot {
+            border-color: var(--danger);
+        }
+
+        .timeline-content {
+            margin-left: 100px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1.5rem;
+            flex: 1;
+            transition: all 0.3s;
+        }
+
+        .timeline-content:hover {
+            background: var(--bg-tertiary);
+            border-color: var(--accent);
+        }
+
+        .timeline-time {
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            color: var(--accent);
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .timeline-status {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .timeline-status.new {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+        }
+
+        .timeline-status.updated {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--warning);
+        }
+
+        .timeline-status.resolved {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--success);
+        }
+
+        .timeline-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 0.5rem 0;
+        }
+
+        .timeline-description {
+            color: var(--text-secondary);
+            margin: 0.75rem 0;
+            font-size: 0.95rem;
+        }
+
+        .timeline-stats {
+            display: flex;
+            gap: 2rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .timeline-stat {
+            flex: 1;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-value {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+
+        .filter-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: var(--font-body);
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover,
+        .filter-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        .mode-toggle {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--accent);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: var(--shadow-md);
+            z-index: 100;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .header h1 {
+                font-size: 1.5rem;
+            }
+
+            .timeline-container::before {
+                left: 20px;
+            }
+
+            .timeline-dot {
+                left: 0;
+                width: 30px;
+                height: 30px;
+                font-size: 1rem;
+            }
+
+            .timeline-content {
+                margin-left: 60px;
+                padding: 1rem;
+            }
+
+            .timeline-meta {
+                grid-template-columns: 1fr;
+            }
+
+            .timeline-stats {
+                flex-direction: column;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>⚡ Incident Timeline</h1>
+        <button class="back-btn" onclick="history.back()">← Back</button>
+    </div>
+
+    <div class="container">
+        <div class="timeline-header">
+            <h2 id="timelineTitle">Outage Timeline</h2>
+            <div id="timelineInfo" class="timeline-meta">
+                <div class="meta-item">
+                    <div class="meta-label">Outage Started</div>
+                    <div class="meta-value" id="startTime">—</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-label">Latest Status</div>
+                    <div class="meta-value" id="latestStatus">—</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-label">Customers Affected</div>
+                    <div class="meta-value" id="customersAffected">—</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-label">Location</div>
+                    <div class="meta-value" id="location">—</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="filter-controls">
+            <button class="filter-btn active" data-filter="all">All Events</button>
+            <button class="filter-btn" data-filter="new">New</button>
+            <button class="filter-btn" data-filter="updated">Updates</button>
+            <button class="filter-btn" data-filter="resolved">Resolved</button>
+        </div>
+
+        <div id="timeline" class="timeline-container">
+            <div class="no-data">Loading incident timeline...</div>
+        </div>
+    </div>
+
+    <button class="mode-toggle" id="modeToggle" title="Toggle dark/light mode">🌙</button>
+
+    <script>
+        // Load dark/light mode preference
+        function initializeMode() {
+            const isDark = localStorage.getItem('nes-dark-mode') !== 'false';
+            if (!isDark) {
+                document.body.classList.add('light-mode');
+                document.getElementById('modeToggle').textContent = '☀️';
+            }
+        }
+
+        document.getElementById('modeToggle').addEventListener('click', function() {
+            const isDark = !document.body.classList.contains('light-mode');
+            document.body.classList.toggle('light-mode');
+            localStorage.setItem('nes-dark-mode', isDark);
+            this.textContent = isDark ? '🌙' : '☀️';
+        });
+
+        // Get outage ID from URL parameter
+        function getOutageId() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('id');
+        }
+
+        // Load and display timeline
+        function loadTimeline() {
+            const outageId = getOutageId();
+            const currentOutages = JSON.parse(localStorage.getItem('nes-current-outages') || '[]');
+            const outage = currentOutages.find(o => o.id === outageId);
+
+            if (!outage) {
+                document.getElementById('timeline').innerHTML = '<div class="no-data">Outage not found</div>';
+                return;
+            }
+
+            // Update header info
+            const startDate = new Date(outage.startTime);
+            document.getElementById('timelineTitle').textContent = `${getNeighborhoodName(outage.zipCode)} - ${startDate.toLocaleDateString()}`;
+            document.getElementById('startTime').textContent = startDate.toLocaleString();
+            document.getElementById('customersAffected').textContent = outage.numPeople.toLocaleString();
+            document.getElementById('location').textContent = getNeighborhoodName(outage.zipCode);
+            document.getElementById('latestStatus').textContent = outage.status || 'Active';
+
+            // Create timeline from event updates
+            const events = generateTimelineEvents(outage);
+            renderTimeline(events);
+        }
+
+        // Generate timeline events from outage
+        function generateTimelineEvents(outage) {
+            const events = [];
+
+            // Initial event
+            events.push({
+                time: new Date(outage.startTime),
+                type: 'new',
+                title: 'Fault Detected',
+                description: `Outage began affecting ${outage.numPeople.toLocaleString()} customers in ${getNeighborhoodName(outage.zipCode)}`,
+                customersAffected: outage.numPeople,
+                status: 'Detected'
+            });
+
+            // Add updates if available
+            if (outage.updates && Array.isArray(outage.updates)) {
+                outage.updates.forEach((update, idx) => {
+                    events.push({
+                        time: new Date(update.timestamp || outage.lastUpdatedTime),
+                        type: 'updated',
+                        title: `Update #${idx + 1}`,
+                        description: update.message || 'Status update',
+                        customersAffected: update.numPeople || outage.numPeople,
+                        status: update.status || 'In Progress'
+                    });
+                });
+            }
+
+            // If resolved, add resolution event
+            if (outage.status === 'Resolved' || outage.status === 'Restored') {
+                events.push({
+                    time: new Date(outage.lastUpdatedTime),
+                    type: 'resolved',
+                    title: 'Power Restored',
+                    description: `Service fully restored to all affected areas`,
+                    customersAffected: 0,
+                    status: 'Resolved'
+                });
+            }
+
+            // If no updates, generate estimated ones based on duration
+            if (!outage.updates || outage.updates.length === 0) {
+                const start = new Date(outage.startTime);
+                const end = new Date(outage.lastUpdatedTime);
+                const duration = (end - start) / (1000 * 60); // minutes
+
+                // Add crew dispatch event
+                if (duration > 15) {
+                    events.push({
+                        time: new Date(start.getTime() + 15 * 60000),
+                        type: 'updated',
+                        title: 'Crews Dispatched',
+                        description: 'Emergency crews assigned to investigate',
+                        customersAffected: outage.numPeople,
+                        status: 'In Progress'
+                    });
+                }
+
+                // Add progress update
+                if (duration > 30) {
+                    events.push({
+                        time: new Date(start.getTime() + Math.min(30, duration / 2) * 60000),
+                        type: 'updated',
+                        title: 'Cause Identified',
+                        description: outage.cause || 'Fault location determined',
+                        customersAffected: outage.numPeople,
+                        status: 'In Progress'
+                    });
+                }
+            }
+
+            // Sort by time
+            return events.sort((a, b) => a.time - b.time);
+        }
+
+        // Render timeline events
+        function renderTimeline(events) {
+            const container = document.getElementById('timeline');
+            
+            if (events.length === 0) {
+                container.innerHTML = '<div class="no-data">No timeline events available</div>';
+                return;
+            }
+
+            const currentFilter = document.querySelector('.filter-btn.active').dataset.filter;
+            let filteredEvents = events;
+
+            if (currentFilter !== 'all') {
+                filteredEvents = events.filter(e => e.type === currentFilter);
+            }
+
+            container.innerHTML = filteredEvents.map(event => {
+                const duration = event.customersAffected > 0 ? 
+                    ` affecting ${event.customersAffected.toLocaleString()} customers` : 
+                    ' - service restored';
+
+                return `
+                    <div class="timeline-item ${event.type}">
+                        <div class="timeline-dot">${getEventIcon(event.type)}</div>
+                        <div class="timeline-content">
+                            <div class="timeline-time">${formatTimelineTime(event.time)}</div>
+                            <span class="timeline-status ${event.type}">${event.type.toUpperCase()}</span>
+                            <div class="timeline-title">${event.title}</div>
+                            <div class="timeline-description">${event.description}</div>
+                            <div class="timeline-stats">
+                                <div class="timeline-stat">
+                                    <div class="stat-label">Customers Affected</div>
+                                    <div class="stat-value">${event.customersAffected.toLocaleString()}</div>
+                                </div>
+                                <div class="timeline-stat">
+                                    <div class="stat-label">Status</div>
+                                    <div class="stat-value">${event.status}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getEventIcon(type) {
+            switch(type) {
+                case 'new': return '⚡';
+                case 'updated': return '🔄';
+                case 'resolved': return '✓';
+                default: return '•';
+            }
+        }
+
+        function formatTimelineTime(date) {
+            const hours = date.getHours().toString().padStart(2, '0');
+            const minutes = date.getMinutes().toString().padStart(2, '0');
+            return `${hours}:${minutes}`;
+        }
+
+        // Filter button handlers
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                loadTimeline();
+            });
+        });
+
+        // Initialize
+        initializeMode();
+        loadTimeline();
+    </script>
+</body>
+</html>

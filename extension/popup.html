@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NES Outage Status</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <div class="header">
+      <span class="title">🔌 NES Status</span>
+      <button id="refresh-btn" class="refresh-btn" title="Refresh now">⟳</button>
+    </div>
+
+    <!-- Timestamp -->
+    <div class="timestamp">
+      <small id="last-updated">Last updated: just now</small>
+    </div>
+
+    <!-- Status Container -->
+    <div id="status-container" class="status-container loading">
+      <p>Loading...</p>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loading-spinner" class="spinner" style="display: none;"></div>
+
+    <!-- Quick Stats -->
+    <div id="stats-container" class="stats-container" style="display: none;">
+      <div id="outages-summary" class="stat-item">
+        <strong id="outage-count">0</strong>
+        <span id="outage-text">outages</span>
+      </div>
+      <div id="affected-list" class="affected-list"></div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="action-buttons">
+      <button id="full-site-btn" class="btn btn-primary">Open Full Site</button>
+      <button id="stats-btn" class="btn btn-secondary">View Stats</button>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <small>
+        <a href="https://nespower.com" target="_blank">nespower.com</a>
+      </small>
+    </div>
+
+    <!-- Error Message -->
+    <div id="error-container" class="error-container" style="display: none;">
+      <p id="error-message"></p>
+      <small>Showing cached data if available</small>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

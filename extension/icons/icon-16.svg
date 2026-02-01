@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <!-- Background -->
+  <circle cx="8" cy="8" r="7.5" fill="#3b82f6" stroke="#1e40af" stroke-width="1"/>
+  
+  <!-- Lightning bolt -->
+  <path d="M8 1 L5 7 L8.5 7 L6 15 L10 7.5 L7 7.5 Z" fill="#fbbf24" stroke="#f59e0b" stroke-width="0.5"/>
+  
+  <!-- Highlight for 3D effect -->
+  <circle cx="8" cy="8" r="7.5" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="0.5" opacity="0.5"/>
+</svg>

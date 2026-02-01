@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "NES Outage Checker",
+  "version": "1.0.0",
+  "description": "Real-time Nashville Electric Service outage status",
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://*.nespower.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "NES Outage Status",
+    "default_icons": {
+      "16": "icons/icon-16.svg",
+      "48": "icons/icon-48.svg",
+      "128": "icons/icon-128.svg"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon-16.svg",
+    "48": "icons/icon-48.svg",
+    "128": "icons/icon-128.svg"
+  },
+  "permissions_warnings": false
+}

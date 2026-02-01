@@ -441,6 +441,157 @@
             max-height: 400px;
         }
 
+        .scorecard-item {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .scorecard-item:hover {
+            border-color: var(--accent);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .scorecard-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 4px;
+            width: 100%;
+            background: var(--accent);
+        }
+
+        .scorecard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .scorecard-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--text-primary);
+        }
+
+        .scorecard-zip {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .scorecard-score {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .scorecard-number {
+            font-size: 2rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .scorecard-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 4px;
+        }
+
+        .scorecard-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 12px;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .scorecard-stat {
+            text-align: center;
+        }
+
+        .scorecard-stat-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .scorecard-stat-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 4px;
+        }
+
+        .scorecard-trend {
+            font-size: 0.85rem;
+            margin-top: 12px;
+            padding: 8px 12px;
+            background: rgba(249, 115, 22, 0.1);
+            border-radius: 6px;
+            color: var(--text-secondary);
+        }
+
+        .similarity-item {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+
+        .similarity-item:hover {
+            border-color: var(--accent);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .similarity-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .similarity-title {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--text-primary);
+        }
+
+        .similarity-confidence {
+            background: rgba(16, 185, 129, 0.15);
+            color: #10B981;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .similarity-details {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        .similarity-meta {
+            display: flex;
+            gap: 20px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+        }
+
         footer {
             margin-top: 48px;
             padding-top: 24px;
@@ -700,6 +851,32 @@
             <h2>📅 Worst Month Report</h2>
             <div id="worstMonthContainer" class="grid">
                 <div class="no-data">Loading monthly analysis...</div>
+            </div>
+        </section>
+
+        <!-- Pattern Recognition - Outage Similarity Matching -->
+        <section>
+            <h2>🔗 Pattern Recognition</h2>
+            <div class="search-section">
+                <div class="search-title">Find Similar Historical Outages</div>
+                <div id="similarOutagesContainer" class="grid">
+                    <div class="no-data">Select an outage from the Monitor page to see similar historical incidents</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Neighborhood Safety Scorecard -->
+        <section>
+            <h2>🛡️ Neighborhood Safety Scores</h2>
+            <div class="search-section">
+                <div class="search-title">Reliability Scorecard by Neighborhood (30-day window)</div>
+                <div style="margin-bottom: 12px; font-size: 0.85rem; color: var(--text-secondary);">
+                    Score = 100 - (frequency_penalty + duration_penalty + recent_incidents_penalty)
+                </div>
+                <div id="scorecardContainer" class="grid">
+                    <div class="no-data">Loading neighborhood scorecards...</div>
+                </div>
+                <button class="search-btn" onclick="exportScorecards()" style="margin-top: 12px;">📥 Export as CSV</button>
             </div>
         </section>
 
@@ -1210,17 +1387,133 @@
             resultEl.innerHTML = html;
         }
 
+        function renderNeighborhoodScorecards() {
+            const scorecards = generateNeighborhoodScorecards(historyData);
+            const container = document.getElementById('scorecardContainer');
+            
+            if (scorecards.length === 0) {
+                container.innerHTML = '<div class="no-data">No scorecard data available</div>';
+                return;
+            }
+
+            container.innerHTML = scorecards.map(sc => {
+                const scoreColor = sc.scorecard.color;
+                return `
+                    <div class="scorecard-item" style="border-left: 4px solid ${scoreColor};">
+                        <div class="scorecard-header">
+                            <div>
+                                <div class="scorecard-name">${sc.name}</div>
+                                <div class="scorecard-zip">${sc.zip}</div>
+                            </div>
+                            <div class="scorecard-score">
+                                <div class="scorecard-number" style="color: ${scoreColor};">${sc.scorecard.score}</div>
+                                <div class="scorecard-label">/100</div>
+                            </div>
+                        </div>
+                        <div style="color: ${scoreColor}; font-weight: 600; margin-bottom: 12px;">${sc.scorecard.rating}</div>
+                        <div class="scorecard-stats">
+                            <div class="scorecard-stat">
+                                <div class="scorecard-stat-value">${sc.outages}</div>
+                                <div class="scorecard-stat-label">30-Day Outages</div>
+                            </div>
+                            <div class="scorecard-stat">
+                                <div class="scorecard-stat-value">${sc.avgDuration}</div>
+                                <div class="scorecard-stat-label">Avg Duration (h)</div>
+                            </div>
+                            <div class="scorecard-stat">
+                                <div class="scorecard-stat-value">${sc.avgAffected.toLocaleString()}</div>
+                                <div class="scorecard-stat-label">Avg Affected</div>
+                            </div>
+                        </div>
+                        <div class="scorecard-trend">
+                            📊 Trend: ${sc.scorecard.monthlyTrend} from last month
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function exportScorecards() {
+            const scorecards = generateNeighborhoodScorecards(historyData);
+            if (scorecards.length === 0) {
+                alert('No data to export');
+                return;
+            }
+
+            const csv = exportScorecardToCSV(scorecards);
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `neighborhood-scorecards-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
+        // Store current outage context for similarity matching
+        function setCurrentOutageContext(outageId) {
+            const currentOutages = JSON.parse(localStorage.getItem('nes-current-outages') || '[]');
+            const outage = currentOutages.find(o => o.id === outageId);
+            if (outage) {
+                sessionStorage.setItem('nes-current-outage', JSON.stringify(outage));
+                renderSimilarOutages();
+            }
+        }
+
+        function renderSimilarOutages() {
+            const container = document.getElementById('similarOutagesContainer');
+            const currentOutage = JSON.parse(sessionStorage.getItem('nes-current-outage') || 'null');
+            
+            if (!currentOutage) {
+                container.innerHTML = '<div class="no-data">Select an outage from the Monitor page to see similar historical incidents</div>';
+                return;
+            }
+
+            // Convert history data to match current outage format
+            const matches = findSimilarOutages(currentOutage, historyData, 3);
+            
+            if (matches.length === 0) {
+                container.innerHTML = '<div class="no-data">No similar historical incidents found</div>';
+                return;
+            }
+
+            container.innerHTML = matches.map(match => {
+                const outage = match.outage;
+                const location = getNeighborhoodName(outage.zipCode);
+                return `
+                    <div class="similarity-item">
+                        <div class="similarity-header">
+                            <div>
+                                <div class="similarity-title">${location} - ${match.when}</div>
+                                <div class="similarity-details">${outage.cause || 'Unknown cause'}</div>
+                            </div>
+                            <div class="similarity-confidence">${match.confidence}% match</div>
+                        </div>
+                        <div class="similarity-meta">
+                            <div>👥 ${outage.numPeople.toLocaleString()} affected</div>
+                            <div>⏱️ Avg ${match.avgDuration} hours</div>
+                            <div>📍 ${getNeighborhoodName(outage.zipCode)}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
         function init() {
             loadTheme();
             loadHistoryData();
             if (historyData.length > 0) {
                 updateStats();
                 renderWorstMonthReport();
+                renderNeighborhoodScorecards();
+                renderSimilarOutages();
             } else {
                 document.getElementById('leaderboardContainer').innerHTML = 
                     '<div class="no-data">No data available yet. Visit the Monitor page to start collecting statistics.</div>';
                 document.getElementById('worstMonthContainer').innerHTML = 
                     '<div class="no-data">No monthly data available.</div>';
+                document.getElementById('scorecardContainer').innerHTML = 
+                    '<div class="no-data">No scorecard data available yet.</div>';
             }
         }
 
