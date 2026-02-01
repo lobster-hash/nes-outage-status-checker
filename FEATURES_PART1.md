@@ -117,3 +117,9 @@ All commits authored by: lobsterhash@gmail.com
 - Compare current outages against 30 years of historical data
 - Match by location, time, customer count, and cause
 - Display confidence percentages
+
+## Neighborhood Safety Scorecard Feature
+- 0-100 reliability score per neighborhood
+- Penalties for frequency, duration, and recent incidents
+- CSV export capability
+- Color-coded ratings (green/yellow/red)
