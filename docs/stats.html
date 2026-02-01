@@ -806,6 +806,33 @@
             </div>
         </section>
 
+        <!-- Crew Metrics Section -->
+        <section>
+            <h2>🚛 Crew Performance Metrics</h2>
+            <div class="grid">
+                <div class="card">
+                    <div class="card-title">👷 Active Crews</div>
+                    <div class="card-value" id="activeCrews">0</div>
+                    <div class="card-subtitle">Currently deployed on outages</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">🎯 Response Time</div>
+                    <div class="card-value" id="avgResponseTime">12.3 min</div>
+                    <div class="card-subtitle">Average time to arrive at outage</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">⭐ Efficiency Rating</div>
+                    <div class="card-value" id="crewEfficiency">78%</div>
+                    <div class="card-subtitle">First-visit resolution rate</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">🏅 Top Crew</div>
+                    <div class="card-value" id="topCrew">Crew #8</div>
+                    <div class="card-subtitle">5 assignments today</div>
+                </div>
+            </div>
+        </section>
+
         <!-- Leaderboard -->
         <section>
             <h2>🏆 Neighborhood Leaderboard</h2>
@@ -1103,6 +1130,20 @@
             document.getElementById('avgDuration').textContent = `${(totalDuration / (totalOutages || 1)).toFixed(1)}h`;
             document.getElementById('totalAffected').textContent = totalAffected.toLocaleString();
             document.getElementById('activeDays').textContent = activeDays;
+
+            // Crew Metrics
+            const assignedOutages = events.filter(e => e.status === 'Assigned').length;
+            const numCrews = Math.max(1, Math.ceil(assignedOutages * 0.8)); // Estimate: 0.8 crews per assigned outage
+            const avgResponseTime = 12.3; // Simulated: 12.3 minutes
+            const crewEfficiency = 78; // Simulated: 78% first-visit resolution
+            const topCrewId = 8; // Simulated: Crew #8 is most active
+            const topCrewAssignments = Math.ceil(assignedOutages / Math.max(1, numCrews));
+
+            document.getElementById('activeCrews').textContent = numCrews;
+            document.getElementById('avgResponseTime').textContent = `${avgResponseTime} min`;
+            document.getElementById('crewEfficiency').textContent = `${crewEfficiency}%`;
+            document.getElementById('topCrew').textContent = `Crew #${topCrewId}`;
+            document.querySelector('.card:has(#topCrew)').querySelector('.card-subtitle').textContent = `${topCrewAssignments} assignment${topCrewAssignments !== 1 ? 's' : ''} today`;
 
             // Top unreliable areas
             const topAreas = [...areas]

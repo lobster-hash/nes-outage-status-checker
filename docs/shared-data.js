@@ -1314,6 +1314,258 @@ function formatGridHealthMetrics(gridStatus) {
     };
 }
 
+/**
+ * CREW TRACKING SYSTEM
+ * Manages crew locations, assignments, and ETA calculations
+ */
+
+// Mock crew depot location (Nashville main office)
+const CREW_DEPOT = {
+    lat: 36.1627,  // Downtown Nashville
+    lon: -86.7816
+};
+
+/**
+ * Generate simulated crew data based on assigned outages
+ * Uses realistic crew deployment patterns
+ * @param {Array} outages - List of outages
+ * @param {number} crewDensity - Crews per 10 outages (default: 0.8)
+ * @returns {Array} Array of crew objects with location and status
+ */
+function generateCrewLocations(outages, crewDensity = 0.8) {
+    const assignedOutages = outages.filter(o => o.status === 'Assigned');
+    const numCrews = Math.max(1, Math.ceil(assignedOutages.length * crewDensity));
+    const crews = [];
+    
+    // Distribute crews across assigned outages
+    for (let i = 0; i < numCrews; i++) {
+        const crewId = 100 + i; // Crew IDs start at 100
+        const assignedIndex = i % assignedOutages.length;
+        const assignedOutage = assignedOutages[assignedIndex];
+        
+        // Simulate crew positioning (between depot and outage with some randomness)
+        const progressToOutage = 0.3 + Math.random() * 0.5; // 30-80% of the way to outage
+        const depotLat = CREW_DEPOT.lat;
+        const depotLon = CREW_DEPOT.lon;
+        const outageLatitude = assignedOutage.latitude;
+        const outageLongitude = assignedOutage.longitude;
+        
+        const crewLat = depotLat + (outageLatitude - depotLat) * progressToOutage;
+        const crewLon = depotLon + (outageLongitude - depotLon) * progressToOutage;
+        
+        crews.push({
+            id: crewId,
+            name: `Crew #${crewId}`,
+            latitude: crewLat,
+            longitude: crewLon,
+            technicians: 2 + Math.floor(Math.random() * 3), // 2-4 technicians
+            assignedOutageId: assignedOutage.id,
+            assignedOutageLocation: assignedOutage.zipCode,
+            status: 'en_route', // 'en_route', 'on_scene', 'completed'
+            lastUpdated: new Date().toISOString(),
+            efficiency: 0.7 + Math.random() * 0.3  // Historical efficiency 70-100%
+        });
+    }
+    
+    return crews;
+}
+
+/**
+ * Calculate ETA from crew location to outage
+ * Uses haversine formula for distance and assumes 25 mph average speed
+ * @param {Object} crew - Crew object with lat/lon
+ * @param {Object} outage - Outage object with lat/lon
+ * @returns {Object} ETA info including minutes and confidence
+ */
+function calculateCrewETA(crew, outage) {
+    // Haversine formula to calculate distance between two points
+    const R = 3959; // Earth radius in miles
+    const dLat = (outage.latitude - crew.latitude) * Math.PI / 180;
+    const dLon = (outage.longitude - crew.longitude) * Math.PI / 180;
+    const a = 
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(crew.latitude * Math.PI / 180) * Math.cos(outage.latitude * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distanceMiles = R * c;
+    
+    // Average speed: 25 mph (considering traffic, turn times, navigation)
+    const avgSpeedMph = 25;
+    const etaMinutes = Math.ceil((distanceMiles / avgSpeedMph) * 60);
+    
+    // Confidence: higher if crew is assigned vs estimated
+    const confidence = crew.status === 'on_scene' ? 'arrived' : crew.status === 'en_route' ? 'high' : 'medium';
+    
+    return {
+        distanceMiles: parseFloat(distanceMiles.toFixed(1)),
+        etaMinutes: etaMinutes,
+        confidence: confidence,
+        arrived: crew.status === 'on_scene',
+        estimatedArrival: new Date(Date.now() + etaMinutes * 60 * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    };
+}
+
+/**
+ * Get comprehensive crew statistics
+ * @param {Array} crews - Array of crew objects
+ * @param {Array} outages - Array of outage objects
+ * @returns {Object} Crew metrics and statistics
+ */
+function getCrewStats(crews, outages) {
+    const assignedOutages = outages.filter(o => o.status === 'Assigned');
+    const crewsOnScene = crews.filter(c => c.status === 'on_scene').length;
+    const crewsEnRoute = crews.filter(c => c.status === 'en_route').length;
+    const crewsCompleted = crews.filter(c => c.status === 'completed').length;
+    
+    // Calculate average response time (simulated based on status)
+    const avgResponseTime = crewsEnRoute > 0 
+        ? Math.round(5 + Math.random() * 10) // 5-15 minutes average
+        : crewsOnScene > 0
+        ? Math.round(15 + Math.random() * 10) // Already responded
+        : 12;
+    
+    // Calculate average efficiency (issues resolved on first visit)
+    const avgEfficiency = crews.length > 0 
+        ? Math.round(crews.reduce((sum, c) => sum + c.efficiency, 0) / crews.length * 100)
+        : 78;
+    
+    // Find busiest crew
+    const busiestCrew = crews.reduce((busiest, crew) => {
+        // Simulated: some crews have multiple assignments
+        return crew.id > busiest.id ? crew : busiest;
+    }, crews[0] || {});
+    
+    return {
+        totalCrews: crews.length,
+        crewsOnScene: crewsOnScene,
+        crewsEnRoute: crewsEnRoute,
+        crewsCompleted: crewsCompleted,
+        assignedOutages: assignedOutages.length,
+        avgResponseTime: avgResponseTime,
+        avgEfficiency: avgEfficiency,
+        busiestCrew: busiestCrew.name || 'N/A',
+        busiestCrewAssignments: Math.ceil(assignedOutages.length / (crews.length || 1))
+    };
+}
+
+/**
+ * Cache crew data in localStorage for 60 seconds
+ * @param {Array} crews - Crew data to cache
+ * @param {string} key - Cache key (default: 'nes-crews')
+ * @returns {Object} Cache object with crews and timestamp
+ */
+function cacheCrewData(crews, key = 'nes-crews') {
+    const cacheObj = {
+        crews: crews,
+        timestamp: Date.now(),
+        ttl: 60000 // 60 seconds
+    };
+    try {
+        localStorage.setItem(key, JSON.stringify(cacheObj));
+    } catch (err) {
+        console.warn('Could not cache crew data:', err);
+    }
+    return cacheObj;
+}
+
+/**
+ * Retrieve cached crew data if still fresh
+ * @param {string} key - Cache key
+ * @returns {Array|null} Crews array or null if expired/missing
+ */
+function getCachedCrewData(key = 'nes-crews') {
+    try {
+        const cached = JSON.parse(localStorage.getItem(key));
+        if (cached && (Date.now() - cached.timestamp) < cached.ttl) {
+            return cached.crews;
+        }
+    } catch (err) {
+        console.warn('Could not retrieve cached crew data:', err);
+    }
+    return null;
+}
+
+/**
+ * Simulate crew arrival at outage
+ * Updates crew status based on distance
+ * @param {Array} crews - Crew objects
+ * @returns {Array} Updated crew objects
+ */
+function updateCrewStatus(crews) {
+    return crews.map(crew => {
+        const distance = crew.distanceMiles || 0;
+        let newStatus = crew.status;
+        
+        if (distance < 0.1 && crew.status === 'en_route') {
+            newStatus = 'on_scene';
+        } else if (crew.status === 'on_scene' && Math.random() > 0.8) {
+            // 20% chance crew completes per update
+            newStatus = 'completed';
+        }
+        
+        return {
+            ...crew,
+            status: newStatus,
+            lastUpdated: new Date().toISOString()
+        };
+    });
+}
+
+/**
+ * Generate crew timeline events for an outage
+ * @param {Object} outage - Outage object
+ * @param {Object} crew - Crew object assigned to outage
+ * @returns {Array} Timeline events
+ */
+function generateCrewTimeline(outage, crew) {
+    const startTime = new Date(outage.startTime);
+    const now = new Date();
+    const timeElapsed = now - startTime;
+    const tenMinutes = 10 * 60 * 1000;
+    const twentyMinutes = 20 * 60 * 1000;
+    
+    const events = [];
+    
+    // Outage started
+    events.push({
+        time: startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        event: 'Outage reported',
+        icon: '🔴'
+    });
+    
+    // Crew assigned (if it happened)
+    if (timeElapsed > 0) {
+        const assignedTime = new Date(startTime.getTime() + 2 * 60 * 1000);
+        events.push({
+            time: assignedTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+            event: `${crew.name} assigned (${crew.technicians} technicians)`,
+            icon: '📋'
+        });
+    }
+    
+    // Crew arrived (if applicable)
+    if (crew.status === 'on_scene' || crew.status === 'completed') {
+        const arrivedTime = new Date(startTime.getTime() + tenMinutes);
+        events.push({
+            time: arrivedTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+            event: `${crew.name} arrived on scene`,
+            icon: '🚛'
+        });
+    }
+    
+    // Power restored (if completed)
+    if (crew.status === 'completed') {
+        const restoredTime = new Date(startTime.getTime() + twentyMinutes);
+        events.push({
+            time: restoredTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+            event: `Power restored by ${crew.name}`,
+            icon: '✅'
+        });
+    }
+    
+    return events;
+}
+
 // Export for use in other files
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
@@ -1369,6 +1621,16 @@ if (typeof module !== 'undefined' && module.exports) {
         generateGridHealthStatus,
         generateGridHistoricalData,
         getGridHealthColor,
-        formatGridHealthMetrics
+        formatGridHealthMetrics,
+        
+        // Crew tracking exports
+        generateCrewLocations,
+        calculateCrewETA,
+        getCrewStats,
+        cacheCrewData,
+        getCachedCrewData,
+        updateCrewStatus,
+        generateCrewTimeline,
+        CREW_DEPOT
     };
 }
