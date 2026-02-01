@@ -1657,6 +1657,70 @@
                 width: 100%;
             }
         }
+
+        /* Mobile Bottom Navigation Bar */
+        @media (max-width: 768px) {
+            body {
+                padding-bottom: 70px;
+            }
+
+            .mobile-bottom-nav {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: 70px;
+                background: var(--bg-secondary);
+                border-top: 1px solid var(--border-color);
+                display: flex;
+                justify-content: space-around;
+                align-items: center;
+                z-index: 99;
+                box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+            }
+
+            .mobile-nav-item {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 4px;
+                padding: 8px 12px;
+                color: var(--text-secondary);
+                text-decoration: none;
+                font-size: 10px;
+                font-weight: 500;
+                transition: all 0.2s;
+                cursor: pointer;
+                border-radius: 8px;
+                flex: 1;
+                height: 100%;
+            }
+
+            .mobile-nav-item:hover {
+                background: var(--bg-tertiary);
+                color: var(--accent);
+            }
+
+            .mobile-nav-item.active {
+                color: var(--accent);
+                background: var(--accent-muted);
+            }
+
+            .mobile-nav-item-icon {
+                font-size: 20px;
+            }
+
+            .mobile-nav-item-label {
+                display: none;
+            }
+        }
+
+        @media (min-width: 769px) {
+            .mobile-bottom-nav {
+                display: none !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -3602,5 +3666,33 @@
             }
         })();
     </script>
+
+    <!-- Mobile Bottom Navigation -->
+    <nav class="mobile-bottom-nav">
+        <a href="index.html" class="mobile-nav-item active" title="Monitor">
+            <span class="mobile-nav-item-icon">🏠</span>
+            <span class="mobile-nav-item-label">Monitor</span>
+        </a>
+        <a href="all.html" class="mobile-nav-item" title="All Outages">
+            <span class="mobile-nav-item-icon">📊</span>
+            <span class="mobile-nav-item-label">Outages</span>
+        </a>
+        <a href="stats.html" class="mobile-nav-item" title="Statistics">
+            <span class="mobile-nav-item-icon">📈</span>
+            <span class="mobile-nav-item-label">Stats</span>
+        </a>
+        <a href="feed.html" class="mobile-nav-item" title="Leaderboard">
+            <span class="mobile-nav-item-icon">🎮</span>
+            <span class="mobile-nav-item-label">Board</span>
+        </a>
+        <a href="alerts.html" class="mobile-nav-item" title="Alerts">
+            <span class="mobile-nav-item-icon">⚙️</span>
+            <span class="mobile-nav-item-label">Alerts</span>
+        </a>
+    </nav>
+
+    <!-- Command Palette and Geofence -->
+    <script src="command-palette.js"></script>
+    <script src="geofence.js"></script>
 </body>
 </html>
