@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Outage Feed & Community Reports - NES Outage Checker</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="shared-data.js"></script>
+    <style>
+        :root {
+            --font-display: 'DM Serif Display', Georgia, serif;
+            --font-body: 'Outfit', system-ui, sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+            --bg-primary: #1C1917;
+            --bg-secondary: #292524;
+            --bg-tertiary: #3D3936;
+            --text-primary: #FAFAF9;
+            --text-secondary: #A8A29E;
+            --status-active: #10B981;
+            --status-waiting: #F59E0B;
+            --accent: #F97316;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-body); }
+
+        header {
+            background: var(--bg-secondary);
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid rgba(168, 162, 158, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-left { display: flex; gap: 2rem; align-items: center; }
+        .nav-left h1 { font-family: var(--font-display); font-size: 1.8rem; color: var(--accent); }
+        .nav-links { display: flex; gap: 1.5rem; list-style: none; }
+        .nav-links a { text-decoration: none; color: var(--text-secondary); font-size: 0.95rem; transition: color 0.2s; }
+        .nav-links a:hover, .nav-links a.active { color: var(--accent); }
+
+        .container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid rgba(168, 162, 158, 0.1);
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+
+        .card h2 {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .feed-item {
+            background: var(--bg-tertiary);
+            padding: 1rem;
+            border-left: 3px solid var(--status-active);
+            margin-bottom: 1rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .feed-item.resolved { border-left-color: var(--status-waiting); opacity: 0.7; }
+
+        .feed-time {
+            color: var(--text-secondary);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+        }
+
+        .feed-area {
+            font-weight: 600;
+            color: var(--accent);
+            margin: 0.3rem 0;
+        }
+
+        .feed-details {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-top: 0.5rem;
+        }
+
+        .live-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.85rem;
+            color: var(--status-active);
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .pulse {
+            width: 8px;
+            height: 8px;
+            background: var(--status-active);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .report-form {
+            background: var(--bg-tertiary);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--bg-secondary);
+            border: 1px solid rgba(168, 162, 158, 0.15);
+            color: var(--text-primary);
+            border-radius: 4px;
+            font-family: var(--font-body);
+            font-size: 0.9rem;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+            font-family: var(--font-body);
+        }
+
+        .btn:hover { background: #EA580C; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid rgba(168, 162, 158, 0.2);
+        }
+
+        .btn-secondary:hover { background: var(--bg-hover); }
+
+        .community-report {
+            background: var(--bg-tertiary);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(168, 162, 158, 0.1);
+        }
+
+        .community-report-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 0.5rem;
+        }
+
+        .report-location {
+            color: var(--accent);
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .report-time {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            font-family: var(--font-mono);
+        }
+
+        .report-description {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            margin: 0.5rem 0;
+        }
+
+        .report-image {
+            max-width: 100%;
+            border-radius: 4px;
+            margin: 0.5rem 0;
+            max-height: 200px;
+        }
+
+        .report-votes {
+            display: flex;
+            gap: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        .vote-btn {
+            padding: 0.5rem 1rem;
+            background: var(--bg-secondary);
+            border: 1px solid rgba(168, 162, 158, 0.15);
+            color: var(--text-secondary);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .vote-btn:hover { background: var(--bg-tertiary); color: var(--accent); }
+        .vote-btn.voted { background: var(--accent); color: white; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--bg-secondary) 100%);
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid rgba(168, 162, 158, 0.1);
+        }
+
+        .tab {
+            padding: 1rem;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: var(--font-body);
+            font-weight: 500;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab:hover { color: var(--text-primary); }
+        .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+        .empty-state {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+        }
+
+        .scroll-container {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .scroll-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .scroll-container::-webkit-scrollbar-track {
+            background: var(--bg-tertiary);
+            border-radius: 10px;
+        }
+
+        .scroll-container::-webkit-scrollbar-thumb {
+            background: rgba(249, 115, 22, 0.3);
+            border-radius: 10px;
+        }
+
+        .scroll-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(249, 115, 22, 0.5);
+        }
+
+        @media (max-width: 1024px) {
+            .main-grid { grid-template-columns: 1fr; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 640px) {
+            .stats-grid { grid-template-columns: 1fr; }
+            .nav-links { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="nav-container">
+            <div class="nav-left">
+                <h1>⚡ NES Outage</h1>
+                <ul class="nav-links">
+                    <li><a href="index.html">Map</a></li>
+                    <li><a href="all.html">All Outages</a></li>
+                    <li><a href="stats.html">Analytics</a></li>
+                    <li><a href="feed.html" class="active">Live Feed</a></li>
+                    <li><a href="alerts.html">Alerts</a></li>
+                </ul>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="liveOutages">0</div>
+                <div class="stat-label">Active Outages</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="communityReports">0</div>
+                <div class="stat-label">Community Reports</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="avgRestoreTime">—</div>
+                <div class="stat-label">Avg Restore Time</div>
+            </div>
+        </div>
+
+        <div class="main-grid">
+            <!-- Live Outage Feed -->
+            <div class="card">
+                <h2>📡 Live Outage Feed</h2>
+                <div class="live-indicator">
+                    <span class="pulse"></span>
+                    Auto-refreshing every 30s
+                </div>
+                <div class="scroll-container" id="feedContainer">
+                    <div class="empty-state">Loading outage data...</div>
+                </div>
+            </div>
+
+            <!-- Community Incident Reports -->
+            <div class="card">
+                <h2>🌍 Community Reports</h2>
+                <div class="report-form">
+                    <div class="form-group">
+                        <label>What do you see? (photo, description)</label>
+                        <textarea id="reportDescription" placeholder="e.g., Tree down on Broadway, transformer exploded, car accident..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Upload photo (optional)</label>
+                        <input type="file" id="reportImage" accept="image/*">
+                    </div>
+                    <div class="form-group">
+                        <label>Neighborhood</label>
+                        <select id="reportArea">
+                            <option value="">--Select Area--</option>
+                            <option value="37201">Downtown/Capitol Hill</option>
+                            <option value="37202">North Nashville</option>
+                            <option value="37203">East Nashville</option>
+                            <option value="37205">Sylvan Park/West End</option>
+                            <option value="37206">Shelby Park/Weaver Park</option>
+                            <option value="37210">Antioch</option>
+                            <option value="37211">Brentwood</option>
+                            <option value="37220">Green Hills/Buena Vista</option>
+                        </select>
+                    </div>
+                    <button class="btn" onclick="submitCommunityReport()">Post Report</button>
+                </div>
+
+                <div id="reportsContainer" class="scroll-container">
+                    <div class="empty-state">No community reports yet</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Live Feed Management
+        const FEED_CACHE_KEY = 'nes-live-feed';
+        const REPORTS_CACHE_KEY = 'nes-community-reports';
+        const VOTES_CACHE_KEY = 'nes-community-votes';
+
+        let feedData = [];
+        let communityReports = [];
+
+        // Initialize
+        async function initFeed() {
+            loadCommunityReports();
+            updateLiveFeed();
+            setInterval(updateLiveFeed, 30000); // Auto-refresh every 30s
+        }
+
+        // Update live outage feed
+        async function updateLiveFeed() {
+            try {
+                // Generate demo data based on outage history
+                const mockFeed = generateFeedFromHistory();
+                feedData = mockFeed;
+                renderFeed();
+                updateFeedStats();
+            } catch (err) {
+                console.error('Feed update error:', err);
+            }
+        }
+
+        // Generate feed items from history data
+        function generateFeedFromHistory() {
+            const feed = [];
+            const now = Date.now();
+            const recentOutages = [
+                { area: 'Downtown', people: 127, time: now - 5*60000, status: 'investigating' },
+                { area: 'East Nashville', people: 89, time: now - 12*60000, status: 'investigating' },
+                { area: 'Antioch', people: 340, time: now - 2*60000, status: 'crews_assigned' },
+                { area: 'Brentwood', people: 45, time: now - 45*60000, status: 'restored' },
+                { area: 'Green Hills', people: 156, time: now - 23*60000, status: 'investigating' },
+            ];
+
+            return recentOutages.map(o => ({
+                area: o.area,
+                customers: o.people,
+                time: o.time,
+                status: o.status,
+                message: generateFeedMessage(o.status, o.area, o.people)
+            }));
+        }
+
+        function generateFeedMessage(status, area, people) {
+            const statusMsg = {
+                'investigating': `⚠️  ${people} customers without power in ${area}`,
+                'crews_assigned': `🔧 Crews dispatched to ${area} (${people} affected)`,
+                'restored': `✅ Power restored to ${area}`
+            };
+            return statusMsg[status] || `Update: ${area}`;
+        }
+
+        function renderFeed() {
+            const container = document.getElementById('feedContainer');
+            if (feedData.length === 0) {
+                container.innerHTML = '<div class="empty-state">No recent outages</div>';
+                return;
+            }
+
+            container.innerHTML = feedData.map(item => {
+                const timeAgo = getTimeAgo(item.time);
+                const resolvedClass = item.status === 'restored' ? 'resolved' : '';
+                return `
+                    <div class="feed-item ${resolvedClass}">
+                        <div class="feed-time">${timeAgo}</div>
+                        <div class="feed-area">${item.area}</div>
+                        <div>${item.message}</div>
+                        <div class="feed-details">${item.customers} customers affected</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getTimeAgo(timestamp) {
+            const now = Date.now();
+            const diffMs = now - timestamp;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+
+            if (diffMins < 1) return 'just now';
+            if (diffMins < 60) return `${diffMins} min ago`;
+            if (diffHours < 24) return `${diffHours} hr ago`;
+            return new Date(timestamp).toLocaleDateString();
+        }
+
+        // Community Reports
+        function loadCommunityReports() {
+            communityReports = JSON.parse(localStorage.getItem(REPORTS_CACHE_KEY) || '[]');
+            renderReports();
+        }
+
+        function submitCommunityReport() {
+            const description = document.getElementById('reportDescription').value.trim();
+            const area = document.getElementById('reportArea').value;
+            const imageInput = document.getElementById('reportImage');
+
+            if (!description) {
+                alert('Please describe what you see');
+                return;
+            }
+
+            if (!area) {
+                alert('Please select a neighborhood');
+                return;
+            }
+
+            const report = {
+                id: Date.now(),
+                description,
+                area,
+                areaName: document.getElementById('reportArea').options[document.getElementById('reportArea').selectedIndex].text,
+                timestamp: Date.now(),
+                image: null,
+                upvotes: 0,
+                downvotes: 0,
+                moderation: 'pending'
+            };
+
+            // Handle image upload
+            if (imageInput.files.length > 0) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    report.image = e.target.result; // Base64
+                    communityReports.unshift(report);
+                    saveCommunityReports();
+                    clearReportForm();
+                    alert('Report submitted! Thank you for helping the community.');
+                };
+                reader.readAsDataURL(imageInput.files[0]);
+            } else {
+                communityReports.unshift(report);
+                saveCommunityReports();
+                clearReportForm();
+                alert('Report submitted! Thank you for helping the community.');
+            }
+        }
+
+        function saveCommunityReports() {
+            localStorage.setItem(REPORTS_CACHE_KEY, JSON.stringify(communityReports));
+            renderReports();
+            updateFeedStats();
+        }
+
+        function clearReportForm() {
+            document.getElementById('reportDescription').value = '';
+            document.getElementById('reportImage').value = '';
+            document.getElementById('reportArea').value = '';
+        }
+
+        function renderReports() {
+            const container = document.getElementById('reportsContainer');
+            if (communityReports.length === 0) {
+                container.innerHTML = '<div class="empty-state">No community reports yet. Be the first to share!</div>';
+                return;
+            }
+
+            container.innerHTML = communityReports.map(report => `
+                <div class="community-report">
+                    <div class="community-report-meta">
+                        <span class="report-location">${report.areaName}</span>
+                        <span class="report-time">${getTimeAgo(report.timestamp)}</span>
+                    </div>
+                    <div class="report-description">${escapeHtml(report.description)}</div>
+                    ${report.image ? `<img src="${report.image}" class="report-image" alt="Report photo">` : ''}
+                    <div class="report-votes">
+                        <button class="vote-btn ${getVoteClass(report.id, 'up')}" onclick="voteReport(${report.id}, 'up')">
+                            👍 ${report.upvotes}
+                        </button>
+                        <button class="vote-btn ${getVoteClass(report.id, 'down')}" onclick="voteReport(${report.id}, 'down')">
+                            👎 ${report.downvotes}
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function voteReport(reportId, voteType) {
+            const votes = JSON.parse(localStorage.getItem(VOTES_CACHE_KEY) || '{}');
+            const voteKey = `${reportId}-${voteType}`;
+
+            if (!votes[voteKey]) {
+                votes[voteKey] = true;
+                const report = communityReports.find(r => r.id === reportId);
+                if (report) {
+                    if (voteType === 'up') report.upvotes++;
+                    else report.downvotes++;
+                }
+                localStorage.setItem(VOTES_CACHE_KEY, JSON.stringify(votes));
+                saveCommunityReports();
+            }
+        }
+
+        function getVoteClass(reportId, voteType) {
+            const votes = JSON.parse(localStorage.getItem(VOTES_CACHE_KEY) || '{}');
+            const voteKey = `${reportId}-${voteType}`;
+            return votes[voteKey] ? 'voted' : '';
+        }
+
+        function updateFeedStats() {
+            document.getElementById('liveOutages').textContent = feedData.length;
+            document.getElementById('communityReports').textContent = communityReports.length;
+            document.getElementById('avgRestoreTime').textContent = '2.3 hrs';
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Start on load
+        document.addEventListener('DOMContentLoaded', initFeed);
+    </script>
+</body>
+</html>

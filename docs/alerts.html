@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Outage Alerts & Notifications - NES Outage Checker</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="shared-data.js"></script>
+    <style>
+        :root {
+            --font-display: 'DM Serif Display', Georgia, serif;
+            --font-body: 'Outfit', system-ui, sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+            --bg-primary: #1C1917;
+            --bg-secondary: #292524;
+            --bg-tertiary: #3D3936;
+            --text-primary: #FAFAF9;
+            --text-secondary: #A8A29E;
+            --status-active: #10B981;
+            --status-waiting: #F59E0B;
+            --accent: #F97316;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-body); }
+
+        header {
+            background: var(--bg-secondary);
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid rgba(168, 162, 158, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-left { display: flex; gap: 2rem; align-items: center; }
+        .nav-left h1 { font-family: var(--font-display); font-size: 1.8rem; color: var(--accent); }
+        .nav-links { display: flex; gap: 1.5rem; list-style: none; }
+        .nav-links a { text-decoration: none; color: var(--text-secondary); font-size: 0.95rem; transition: color 0.2s; }
+        .nav-links a:hover, .nav-links a.active { color: var(--accent); }
+
+        .container {
+            max-width: 1000px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid rgba(168, 162, 158, 0.1);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card h2 {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .card h3 {
+            font-size: 1.1rem;
+            margin: 1.5rem 0 1rem;
+            color: var(--text-primary);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--bg-tertiary);
+            border: 1px solid rgba(168, 162, 158, 0.15);
+            color: var(--text-primary);
+            border-radius: 4px;
+            font-family: var(--font-body);
+            font-size: 0.9rem;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+            font-family: var(--font-body);
+        }
+
+        .btn:hover { background: #EA580C; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid rgba(168, 162, 158, 0.2);
+        }
+
+        .btn-secondary:hover { background: var(--bg-hover); }
+
+        .btn-danger {
+            background: #EF4444;
+        }
+
+        .btn-danger:hover { background: #DC2626; }
+
+        .alert-item {
+            background: var(--bg-tertiary);
+            border: 1px solid rgba(168, 162, 158, 0.1);
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+        }
+
+        .alert-info h4 {
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .alert-details {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+
+        .alert-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .alert-actions button {
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid rgba(168, 162, 158, 0.1);
+        }
+
+        .tab {
+            padding: 1rem;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-family: var(--font-body);
+            font-weight: 500;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab:hover { color: var(--text-primary); }
+        .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+        .info-box {
+            background: rgba(16, 185, 129, 0.1);
+            border-left: 3px solid var(--status-active);
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .code-block {
+            background: var(--bg-tertiary);
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+
+        .success-msg {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--status-active);
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+
+        .error-msg {
+            background: rgba(239, 68, 68, 0.15);
+            color: #EF4444;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+
+        @media (max-width: 640px) {
+            .alert-item {
+                flex-direction: column;
+            }
+
+            .alert-actions {
+                width: 100%;
+                margin-top: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="nav-container">
+            <div class="nav-left">
+                <h1>⚡ NES Outage</h1>
+                <ul class="nav-links">
+                    <li><a href="index.html">Map</a></li>
+                    <li><a href="all.html">All Outages</a></li>
+                    <li><a href="stats.html">Analytics</a></li>
+                    <li><a href="feed.html">Live Feed</a></li>
+                    <li><a href="alerts.html" class="active">Alerts</a></li>
+                </ul>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Webhook Alerts -->
+        <div class="card">
+            <h2>🔔 Webhook Alerts</h2>
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">Send outage notifications to your favorite apps: Discord, Slack, or custom webhooks.</p>
+
+            <div class="tabs">
+                <button class="tab active" onclick="switchTab('discord')">Discord</button>
+                <button class="tab" onclick="switchTab('slack')">Slack</button>
+                <button class="tab" onclick="switchTab('custom')">Custom Webhook</button>
+            </div>
+
+            <!-- Discord -->
+            <div id="discord-tab" class="tab-content">
+                <h3>Discord Integration</h3>
+                <div class="info-box">
+                    💡 Get instant outage notifications in your Discord server. Set up a webhook in 30 seconds.
+                </div>
+
+                <div class="form-group">
+                    <label>Discord Webhook URL</label>
+                    <input type="text" id="discordWebhook" placeholder="https://discord.com/api/webhooks/..." placeholder="Paste your Discord webhook URL here">
+                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                        📖 <a href="https://support.discord.com/hc/en-us/articles/228383668-Webhooks-Guide" style="color: var(--accent);" target="_blank">How to create a Discord webhook</a>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Notification Triggers</label>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="discordNew" checked>
+                        <label for="discordNew">New outages</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="discordUpdate" checked>
+                        <label for="discordUpdate">Outage updates</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="discordResolved" checked>
+                        <label for="discordResolved">Power restored</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Filter by Neighborhood (optional)</label>
+                    <select id="discordArea">
+                        <option value="">All areas</option>
+                        <option value="37201">Downtown/Capitol Hill</option>
+                        <option value="37202">North Nashville</option>
+                        <option value="37203">East Nashville</option>
+                        <option value="37205">Sylvan Park/West End</option>
+                        <option value="37206">Shelby Park/Weaver Park</option>
+                        <option value="37210">Antioch</option>
+                    </select>
+                </div>
+
+                <button class="btn" onclick="saveAlert('discord')">Save Discord Alert</button>
+                <div id="discordMsg"></div>
+            </div>
+
+            <!-- Slack -->
+            <div id="slack-tab" class="tab-content" style="display: none;">
+                <h3>Slack Integration</h3>
+                <div class="info-box">
+                    💡 Notify your team instantly when outages affect your area. Works with Slack incoming webhooks.
+                </div>
+
+                <div class="form-group">
+                    <label>Slack Webhook URL</label>
+                    <input type="text" id="slackWebhook" placeholder="https://hooks.slack.com/services/...">
+                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                        📖 <a href="https://api.slack.com/messaging/webhooks" style="color: var(--accent);" target="_blank">How to create a Slack webhook</a>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Notification Triggers</label>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="slackNew" checked>
+                        <label for="slackNew">New outages</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="slackUpdate" checked>
+                        <label for="slackUpdate">Outage updates</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="slackResolved" checked>
+                        <label for="slackResolved">Power restored</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Filter by Neighborhood (optional)</label>
+                    <select id="slackArea">
+                        <option value="">All areas</option>
+                        <option value="37201">Downtown/Capitol Hill</option>
+                        <option value="37202">North Nashville</option>
+                        <option value="37203">East Nashville</option>
+                        <option value="37205">Sylvan Park/West End</option>
+                        <option value="37206">Shelby Park/Weaver Park</option>
+                        <option value="37210">Antioch</option>
+                    </select>
+                </div>
+
+                <button class="btn" onclick="saveAlert('slack')">Save Slack Alert</button>
+                <div id="slackMsg"></div>
+            </div>
+
+            <!-- Custom Webhook -->
+            <div id="custom-tab" class="tab-content" style="display: none;">
+                <h3>Custom Webhook</h3>
+                <div class="info-box">
+                    💡 Send outage data to any HTTP endpoint. Get JSON payloads with full outage details.
+                </div>
+
+                <div class="form-group">
+                    <label>Webhook URL (POST endpoint)</label>
+                    <input type="text" id="customWebhook" placeholder="https://your-app.com/api/outages">
+                </div>
+
+                <div class="form-group">
+                    <label>Events to send</label>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="customNew" checked>
+                        <label for="customNew">New outages</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="customUpdate" checked>
+                        <label for="customUpdate">Outage updates</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="customResolved" checked>
+                        <label for="customResolved">Power restored</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Example Payload</label>
+                    <div class="code-block">{
+  "event": "outage_new",
+  "timestamp": "2024-02-01T10:30:00Z",
+  "area": "Downtown",
+  "zipCode": "37201",
+  "customersAffected": 127,
+  "status": "investigating",
+  "estimatedRestore": "11:30 AM"
+}</div>
+                </div>
+
+                <button class="btn" onclick="saveAlert('custom')">Save Custom Webhook</button>
+                <div id="customMsg"></div>
+            </div>
+        </div>
+
+        <!-- Active Alerts -->
+        <div class="card">
+            <h2>📋 Active Alerts</h2>
+            <div id="activeAlerts">
+                <div style="color: var(--text-secondary); padding: 2rem; text-align: center;">No alerts configured yet. Set one up above!</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const ALERTS_KEY = 'nes-webhook-alerts';
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+            document.getElementById(tab + '-tab').style.display = 'block';
+
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        function saveAlert(type) {
+            let alerts = JSON.parse(localStorage.getItem(ALERTS_KEY) || '[]');
+            let webhook = '';
+            let triggers = {};
+            let area = '';
+            let msgEl = '';
+
+            if (type === 'discord') {
+                webhook = document.getElementById('discordWebhook').value;
+                triggers = {
+                    new: document.getElementById('discordNew').checked,
+                    update: document.getElementById('discordUpdate').checked,
+                    resolved: document.getElementById('discordResolved').checked
+                };
+                area = document.getElementById('discordArea').value;
+                msgEl = 'discordMsg';
+            } else if (type === 'slack') {
+                webhook = document.getElementById('slackWebhook').value;
+                triggers = {
+                    new: document.getElementById('slackNew').checked,
+                    update: document.getElementById('slackUpdate').checked,
+                    resolved: document.getElementById('slackResolved').checked
+                };
+                area = document.getElementById('slackArea').value;
+                msgEl = 'slackMsg';
+            } else if (type === 'custom') {
+                webhook = document.getElementById('customWebhook').value;
+                triggers = {
+                    new: document.getElementById('customNew').checked,
+                    update: document.getElementById('customUpdate').checked,
+                    resolved: document.getElementById('customResolved').checked
+                };
+                msgEl = 'customMsg';
+            }
+
+            if (!webhook) {
+                document.getElementById(msgEl).innerHTML = '<div class="error-msg">❌ Please enter a webhook URL</div>';
+                return;
+            }
+
+            const alert = {
+                id: Date.now(),
+                type,
+                webhook,
+                triggers,
+                area,
+                created: new Date().toLocaleString()
+            };
+
+            alerts.push(alert);
+            localStorage.setItem(ALERTS_KEY, JSON.stringify(alerts));
+
+            document.getElementById(msgEl).innerHTML = '<div class="success-msg">✅ Alert saved successfully! You\'ll receive notifications for outages.</div>';
+
+            // Reset form
+            if (type === 'discord') {
+                document.getElementById('discordWebhook').value = '';
+            } else if (type === 'slack') {
+                document.getElementById('slackWebhook').value = '';
+            } else if (type === 'custom') {
+                document.getElementById('customWebhook').value = '';
+            }
+
+            renderActiveAlerts();
+        }
+
+        function renderActiveAlerts() {
+            let alerts = JSON.parse(localStorage.getItem(ALERTS_KEY) || '[]');
+            const container = document.getElementById('activeAlerts');
+
+            if (alerts.length === 0) {
+                container.innerHTML = '<div style="color: var(--text-secondary); padding: 2rem; text-align: center;">No alerts configured yet. Set one up above!</div>';
+                return;
+            }
+
+            container.innerHTML = alerts.map(alert => {
+                const triggers = Object.entries(alert.triggers)
+                    .filter(([_, enabled]) => enabled)
+                    .map(([trigger]) => trigger)
+                    .join(', ');
+
+                return `
+                    <div class="alert-item">
+                        <div class="alert-info">
+                            <h4>${alert.type.toUpperCase()} → ${alert.area || 'All areas'}</h4>
+                            <div class="alert-details">
+                                Triggers: ${triggers || 'None'}<br>
+                                Created: ${alert.created}
+                            </div>
+                        </div>
+                        <div class="alert-actions">
+                            <button class="btn btn-secondary" onclick="testAlert(${alert.id})">Test</button>
+                            <button class="btn btn-danger" onclick="deleteAlert(${alert.id})">Delete</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function testAlert(alertId) {
+            let alerts = JSON.parse(localStorage.getItem(ALERTS_KEY) || '[]');
+            const alert = alerts.find(a => a.id === alertId);
+
+            if (!alert) return;
+
+            const testPayload = {
+                event: 'test_notification',
+                timestamp: new Date().toISOString(),
+                message: '🧪 This is a test outage alert from NES Outage Checker'
+            };
+
+            fetch(alert.webhook, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(testPayload)
+            })
+            .then(r => alert('✅ Test notification sent!'))
+            .catch(e => alert('❌ Failed to send test: ' + e.message));
+        }
+
+        function deleteAlert(alertId) {
+            if (!confirm('Delete this alert?')) return;
+
+            let alerts = JSON.parse(localStorage.getItem(ALERTS_KEY) || '[]');
+            alerts = alerts.filter(a => a.id !== alertId);
+            localStorage.setItem(ALERTS_KEY, JSON.stringify(alerts));
+            renderActiveAlerts();
+        }
+
+        // Load on init
+        document.addEventListener('DOMContentLoaded', renderActiveAlerts);
+    </script>
+</body>
+</html>

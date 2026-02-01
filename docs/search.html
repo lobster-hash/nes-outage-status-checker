@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Outage Search - NES Outage Checker</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="shared-data.js"></script>
+    <script src="api.js"></script>
+    <style>
+        :root {
+            --font-display: 'DM Serif Display', Georgia, serif;
+            --font-body: 'Outfit', system-ui, sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
+            --bg-primary: #1C1917;
+            --bg-secondary: #292524;
+            --bg-tertiary: #3D3936;
+            --text-primary: #FAFAF9;
+            --text-secondary: #A8A29E;
+            --status-active: #10B981;
+            --status-waiting: #F59E0B;
+            --accent: #F97316;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; background: var(--bg-primary); color: var(--text-primary); font-family: var(--font-body); }
+
+        header {
+            background: var(--bg-secondary);
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid rgba(168, 162, 158, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .nav-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .nav-left { display: flex; gap: 2rem; align-items: center; }
+        .nav-left h1 { font-family: var(--font-display); font-size: 1.8rem; color: var(--accent); }
+        .nav-links { display: flex; gap: 1.5rem; list-style: none; }
+        .nav-links a { text-decoration: none; color: var(--text-secondary); font-size: 0.95rem; transition: color 0.2s; }
+        .nav-links a:hover, .nav-links a.active { color: var(--accent); }
+
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid rgba(168, 162, 158, 0.1);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card h2 {
+            font-family: var(--font-display);
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .filter-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .form-group input,
+        .form-group select {
+            padding: 0.75rem;
+            background: var(--bg-tertiary);
+            border: 1px solid rgba(168, 162, 158, 0.15);
+            color: var(--text-primary);
+            border-radius: 4px;
+            font-family: var(--font-body);
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+            font-family: var(--font-body);
+        }
+
+        .btn:hover { background: #EA580C; }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid rgba(168, 162, 158, 0.2);
+        }
+
+        .btn-secondary:hover { background: var(--bg-hover); }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .result-card {
+            background: var(--bg-tertiary);
+            border: 1px solid rgba(168, 162, 158, 0.1);
+            padding: 1rem;
+            border-radius: 8px;
+        }
+
+        .result-card h3 {
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+
+        .result-details {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+
+        .share-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .share-btn {
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            flex: 1;
+            text-align: center;
+        }
+
+        .timeline-item {
+            display: flex;
+            gap: 1rem;
+            padding: 1rem;
+            background: var(--bg-tertiary);
+            border-left: 3px solid var(--accent);
+            margin-bottom: 1rem;
+            border-radius: 4px;
+        }
+
+        .timeline-dot {
+            width: 20px;
+            height: 20px;
+            background: var(--accent);
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .timeline-content h4 {
+            margin-bottom: 0.3rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 768px) {
+            .filter-grid { grid-template-columns: 1fr; }
+            .results-grid { grid-template-columns: 1fr; }
+            .share-buttons { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="nav-container">
+            <div class="nav-left">
+                <h1>⚡ NES Outage</h1>
+                <ul class="nav-links">
+                    <li><a href="index.html">Map</a></li>
+                    <li><a href="all.html">All Outages</a></li>
+                    <li><a href="stats.html">Analytics</a></li>
+                    <li><a href="feed.html">Live Feed</a></li>
+                    <li><a href="search.html" class="active">Search</a></li>
+                    <li><a href="alerts.html">Alerts</a></li>
+                </ul>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Advanced Search & Filtering -->
+        <div class="card">
+            <h2>🔍 Advanced Outage Search</h2>
+            
+            <div class="filter-grid">
+                <div class="form-group">
+                    <label>Search Area</label>
+                    <input type="text" id="searchArea" placeholder="Search neighborhood...">
+                </div>
+                <div class="form-group">
+                    <label>Start Date</label>
+                    <input type="date" id="startDate">
+                </div>
+                <div class="form-group">
+                    <label>End Date</label>
+                    <input type="date" id="endDate">
+                </div>
+                <div class="form-group">
+                    <label>Minimum Duration (hours)</label>
+                    <input type="number" id="minDuration" min="0" step="0.5" placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label>Minimum Customers Affected</label>
+                    <input type="number" id="minCustomers" min="0" step="10" placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label>Cause (if available)</label>
+                    <select id="cause">
+                        <option value="">Any cause</option>
+                        <option value="weather">Weather</option>
+                        <option value="accident">Accident</option>
+                        <option value="equipment">Equipment Failure</option>
+                        <option value="maintenance">Maintenance</option>
+                        <option value="unknown">Unknown</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 1rem;">
+                <button class="btn" onclick="performSearch()">Search</button>
+                <button class="btn btn-secondary" onclick="resetSearch()">Reset</button>
+                <button class="btn btn-secondary" onclick="exportResults()">📥 Export CSV</button>
+            </div>
+
+            <div id="searchResults" style="margin-top: 2rem;"></div>
+        </div>
+
+        <!-- Outage Timeline -->
+        <div class="card">
+            <h2>📅 Outage Timeline</h2>
+            <div class="form-group" style="margin-bottom: 1rem;">
+                <label>Timeline View</label>
+                <select id="timelineType" onchange="updateTimeline()">
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                </select>
+            </div>
+            <div id="timelineContainer"></div>
+        </div>
+
+        <!-- Sharing & Export -->
+        <div class="card">
+            <h2>🔗 Share Your Findings</h2>
+            <div class="share-buttons">
+                <button class="btn btn-secondary share-btn" onclick="shareOnTwitter()">Share on Twitter</button>
+                <button class="btn btn-secondary share-btn" onclick="shareOnFacebook()">Share on Facebook</button>
+                <button class="btn btn-secondary share-btn" onclick="copyShareLink()">📋 Copy Link</button>
+                <button class="btn btn-secondary share-btn" onclick="downloadReliabilityBadge()">📊 Reliability Badge</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let fullHistoryData = [];
+
+        // Initialize with mock data
+        function initSearch() {
+            // In production, fetch from API
+            fullHistoryData = generateMockHistory();
+            setDefaultDates();
+        }
+
+        function generateMockHistory() {
+            // Generate 3 months of mock outage data
+            const data = [];
+            const now = Date.now();
+            
+            for (let i = 0; i < 50; i++) {
+                const daysAgo = Math.floor(Math.random() * 90);
+                const startTime = now - (daysAgo * 24 * 60 * 60 * 1000);
+                const duration = Math.random() * 6 + 0.5;
+                
+                data.push({
+                    zipCode: ['37201', '37202', '37203', '37205', '37210', '37211'][Math.floor(Math.random() * 6)],
+                    numPeople: Math.floor(Math.random() * 300) + 50,
+                    startTime,
+                    lastUpdatedTime: startTime + (duration * 60 * 60 * 1000),
+                    status: 'resolved',
+                    cause: ['weather', 'accident', 'equipment', 'unknown'][Math.floor(Math.random() * 4)]
+                });
+            }
+            
+            return data;
+        }
+
+        function setDefaultDates() {
+            const today = new Date();
+            const threeMonthsAgo = new Date(today.getTime() - 90*24*60*60*1000);
+            
+            document.getElementById('startDate').valueAsDate = threeMonthsAgo;
+            document.getElementById('endDate').valueAsDate = today;
+        }
+
+        function performSearch() {
+            let results = fullHistoryData;
+            
+            // Apply filters
+            const searchArea = document.getElementById('searchArea').value;
+            const startDate = document.getElementById('startDate').valueAsDate;
+            const endDate = document.getElementById('endDate').valueAsDate;
+            const minDuration = parseFloat(document.getElementById('minDuration').value) || 0;
+            const minCustomers = parseInt(document.getElementById('minCustomers').value) || 0;
+            const cause = document.getElementById('cause').value;
+            
+            if (searchArea) {
+                results = searchByArea(results, searchArea);
+            }
+            
+            if (startDate && endDate) {
+                results = filterByDateRange(results, startDate, new Date(endDate.getTime() + 24*60*60*1000));
+            }
+            
+            if (minDuration > 0) {
+                results = filterBySeverity(results, minDuration);
+            }
+            
+            if (minCustomers > 0) {
+                results = filterByImpact(results, minCustomers);
+            }
+            
+            if (cause) {
+                results = filterByCause(results, cause);
+            }
+            
+            renderSearchResults(results);
+        }
+
+        function renderSearchResults(results) {
+            const container = document.getElementById('searchResults');
+            
+            if (results.length === 0) {
+                container.innerHTML = '<div class="empty-state">No outages match your search criteria.</div>';
+                return;
+            }
+            
+            container.innerHTML = `
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">Found ${results.length} outages</p>
+                <div class="results-grid">
+                    ${results.map(outage => `
+                        <div class="result-card">
+                            <h3>${getNeighborhoodName(outage.zipCode)}</h3>
+                            <div class="result-details">
+                                <p><strong>Date:</strong> ${new Date(outage.startTime).toLocaleDateString()}</p>
+                                <p><strong>Customers:</strong> ${outage.numPeople}</p>
+                                <p><strong>Duration:</strong> ${((outage.lastUpdatedTime - outage.startTime) / (1000*60*60)).toFixed(1)} hours</p>
+                                ${outage.cause ? `<p><strong>Cause:</strong> ${outage.cause}</p>` : ''}
+                            </div>
+                            <div class="share-buttons">
+                                <button class="btn btn-secondary share-btn" style="font-size: 0.75rem;" onclick="copyOutageDetails(this)">📋 Copy</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        function resetSearch() {
+            document.getElementById('searchArea').value = '';
+            document.getElementById('minDuration').value = '';
+            document.getElementById('minCustomers').value = '';
+            document.getElementById('cause').value = '';
+            document.getElementById('searchResults').innerHTML = '';
+            setDefaultDates();
+        }
+
+        function exportResults() {
+            const results = fullHistoryData;
+            const csv = exportToCSV(results);
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `nes-outage-search-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+        }
+
+        function updateTimeline() {
+            const type = document.getElementById('timelineType').value;
+            const timeline = getOutageTimeline(fullHistoryData);
+            
+            const container = document.getElementById('timelineContainer');
+            const entries = Object.entries(timeline).sort().reverse().slice(0, 30);
+            
+            if (entries.length === 0) {
+                container.innerHTML = '<div class="empty-state">No timeline data</div>';
+                return;
+            }
+            
+            container.innerHTML = entries.map(([date, outages]) => `
+                <div class="timeline-item">
+                    <div class="timeline-dot"></div>
+                    <div class="timeline-content">
+                        <h4>${date}</h4>
+                        <p>${outages.length} outages - ${outages.reduce((sum, o) => sum + o.numPeople, 0)} customers affected</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function shareOnTwitter() {
+            const text = `I analyzed #Nashville power outages with NES Outage Checker. Check out the data!`;
+            const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(window.location.href)}`;
+            window.open(url, '_blank');
+        }
+
+        function shareOnFacebook() {
+            const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`;
+            window.open(url, '_blank');
+        }
+
+        function copyShareLink() {
+            navigator.clipboard.writeText(window.location.href);
+            alert('✅ Link copied to clipboard!');
+        }
+
+        function copyOutageDetails(btn) {
+            const card = btn.closest('.result-card');
+            const text = card.innerText;
+            navigator.clipboard.writeText(text);
+            btn.textContent = '✅ Copied!';
+            setTimeout(() => { btn.textContent = '📋 Copy'; }, 2000);
+        }
+
+        function downloadReliabilityBadge() {
+            const stats = {
+                outages: fullHistoryData.length,
+                avgDuration: fullHistoryData.reduce((sum, o) => sum + (o.lastUpdatedTime - o.startTime) / (1000*60*60), 0) / fullHistoryData.length,
+                totalAffected: fullHistoryData.reduce((sum, o) => sum + o.numPeople, 0)
+            };
+            
+            const badge = generateReliabilityBadge(stats);
+            alert('Badge generated! (In production, would download SVG/PNG)');
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', initSearch);
+    </script>
+</body>
+</html>

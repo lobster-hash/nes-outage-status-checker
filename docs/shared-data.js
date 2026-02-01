@@ -300,6 +300,274 @@ function findWorstMonth(monthlySummary) {
     };
 }
 
+/**
+ * Advanced filtering utilities for outage history
+ */
+
+/**
+ * Filter outages by date range
+ * @param {Array} historyData - History array
+ * @param {Date} startDate - Start date
+ * @param {Date} endDate - End date
+ * @returns {Array} Filtered outages
+ */
+function filterByDateRange(historyData, startDate, endDate) {
+    const start = startDate.getTime();
+    const end = endDate.getTime();
+    
+    return historyData.filter(entry => {
+        const entryTime = new Date(entry.startTime).getTime();
+        return entryTime >= start && entryTime <= end;
+    });
+}
+
+/**
+ * Filter outages by cause/type
+ * @param {Array} historyData - History array
+ * @param {string} cause - Cause filter (e.g., 'weather', 'accident', 'equipment', 'unknown')
+ * @returns {Array} Filtered outages
+ */
+function filterByCause(historyData, cause) {
+    return historyData.filter(entry => 
+        (entry.cause || 'unknown').toLowerCase() === cause.toLowerCase()
+    );
+}
+
+/**
+ * Filter outages by severity/duration
+ * @param {Array} historyData - History array
+ * @param {number} minDurationHours - Minimum duration
+ * @param {number} maxDurationHours - Maximum duration
+ * @returns {Array} Filtered outages
+ */
+function filterBySeverity(historyData, minDurationHours = 0, maxDurationHours = Infinity) {
+    return historyData.filter(entry => {
+        const duration = (entry.lastUpdatedTime - entry.startTime) / (1000 * 60 * 60);
+        return duration >= minDurationHours && duration <= maxDurationHours;
+    });
+}
+
+/**
+ * Filter outages by impact (number of customers)
+ * @param {Array} historyData - History array
+ * @param {number} minCustomers - Minimum customers affected
+ * @returns {Array} Filtered outages
+ */
+function filterByImpact(historyData, minCustomers) {
+    return historyData.filter(entry => entry.numPeople >= minCustomers);
+}
+
+/**
+ * Search outages by area name
+ * @param {Array} historyData - History array
+ * @param {string} searchTerm - Search term
+ * @returns {Array} Matching outages
+ */
+function searchByArea(historyData, searchTerm) {
+    const term = searchTerm.toLowerCase();
+    return historyData.filter(entry => {
+        const areaName = getNeighborhoodName(entry.zipCode).toLowerCase();
+        return areaName.includes(term);
+    });
+}
+
+/**
+ * Get timeline of outages by day
+ * @param {Array} historyData - History array
+ * @returns {Object} Day -> outages mapping
+ */
+function getOutageTimeline(historyData) {
+    const timeline = {};
+    
+    historyData.forEach(entry => {
+        const date = new Date(entry.startTime);
+        const dayKey = date.toISOString().split('T')[0];
+        
+        if (!timeline[dayKey]) {
+            timeline[dayKey] = [];
+        }
+        timeline[dayKey].push(entry);
+    });
+    
+    return timeline;
+}
+
+/**
+ * Get day-of-week distribution (which days have most outages)
+ * @param {Array} historyData - History array
+ * @returns {Object} Day name -> count
+ */
+function getDayOfWeekDistribution(historyData) {
+    const dayMap = {
+        'Monday': 0,
+        'Tuesday': 0,
+        'Wednesday': 0,
+        'Thursday': 0,
+        'Friday': 0,
+        'Saturday': 0,
+        'Sunday': 0
+    };
+    
+    historyData.forEach(entry => {
+        const date = new Date(entry.startTime);
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const dayName = dayNames[date.getDay()];
+        dayMap[dayName]++;
+    });
+    
+    return dayMap;
+}
+
+/**
+ * Calculate trend analysis over time
+ * @param {Array} historyData - History array
+ * @param {number} periodDays - Number of days to compare (e.g., 30)
+ * @returns {Object} Trend data with percentages
+ */
+function calculateTrend(historyData, periodDays = 30) {
+    const now = Date.now();
+    const recentStart = now - (periodDays * 24 * 60 * 60 * 1000);
+    const olderStart = recentStart - (periodDays * 24 * 60 * 60 * 1000);
+    
+    const recentOutages = historyData.filter(e => {
+        const time = new Date(e.startTime).getTime();
+        return time >= recentStart;
+    });
+    
+    const olderOutages = historyData.filter(e => {
+        const time = new Date(e.startTime).getTime();
+        return time >= olderStart && time < recentStart;
+    });
+    
+    const recentCount = recentOutages.length;
+    const olderCount = olderOutages.length;
+    const percentChange = olderCount > 0 ? ((recentCount - olderCount) / olderCount) * 100 : 0;
+    
+    return {
+        recent: recentCount,
+        older: olderCount,
+        percentChange: percentChange.toFixed(1),
+        trend: percentChange > 0 ? 'up' : percentChange < 0 ? 'down' : 'stable'
+    };
+}
+
+/**
+ * Get worst neighborhoods (by various metrics)
+ * @param {Array} historyData - History array
+ * @param {number} limit - Number of top results
+ * @returns {Array} Ranked neighborhoods
+ */
+function getWorstNeighborhoods(historyData, limit = 10) {
+    const areaStats = {};
+    
+    historyData.forEach(entry => {
+        const area = entry.zipCode || 'unknown';
+        const areaName = getNeighborhoodName(area);
+        
+        if (!areaStats[area]) {
+            areaStats[area] = {
+                area,
+                name: areaName,
+                outages: 0,
+                totalDuration: 0,
+                totalAffected: 0
+            };
+        }
+        
+        const duration = (entry.lastUpdatedTime - entry.startTime) / (1000 * 60 * 60);
+        areaStats[area].outages++;
+        areaStats[area].totalDuration += duration;
+        areaStats[area].totalAffected += entry.numPeople;
+    });
+    
+    return Object.values(areaStats)
+        .sort((a, b) => b.outages - a.outages)
+        .slice(0, limit)
+        .map(a => ({
+            ...a,
+            avgDuration: (a.totalDuration / a.outages).toFixed(2),
+            avgAffected: Math.round(a.totalAffected / a.outages),
+            score: calculateReliabilityScore({
+                outages: a.outages,
+                avgDuration: a.totalDuration / a.outages,
+                totalAffected: a.totalAffected
+            })
+        }));
+}
+
+/**
+ * Get seasonal analysis (patterns by month/season)
+ * @param {Array} historyData - History array
+ * @returns {Object} Season -> stats
+ */
+function getSeasonalAnalysis(historyData) {
+    const seasons = {
+        'Winter': { months: [12, 1, 2], outages: 0, duration: 0 },
+        'Spring': { months: [3, 4, 5], outages: 0, duration: 0 },
+        'Summer': { months: [6, 7, 8], outages: 0, duration: 0 },
+        'Fall': { months: [9, 10, 11], outages: 0, duration: 0 }
+    };
+    
+    historyData.forEach(entry => {
+        const date = new Date(entry.startTime);
+        const month = date.getMonth() + 1;
+        const duration = (entry.lastUpdatedTime - entry.startTime) / (1000 * 60 * 60);
+        
+        Object.entries(seasons).forEach(([season, data]) => {
+            if (data.months.includes(month)) {
+                data.outages++;
+                data.duration += duration;
+            }
+        });
+    });
+    
+    // Calculate averages
+    Object.values(seasons).forEach(season => {
+        if (season.outages > 0) {
+            season.avgDuration = (season.duration / season.outages).toFixed(2);
+        }
+    });
+    
+    return seasons;
+}
+
+/**
+ * Generate advanced analytics summary
+ * @param {Array} historyData - History array
+ * @returns {Object} Comprehensive analytics
+ */
+function generateAdvancedAnalytics(historyData) {
+    if (historyData.length === 0) {
+        return {
+            status: 'no_data',
+            message: 'No outage history available'
+        };
+    }
+    
+    const timeline = getOutageTimeline(historyData);
+    const dayDistribution = getDayOfWeekDistribution(historyData);
+    const hourDistribution = getHourlyDistribution(historyData);
+    const monthSummary = getMonthlySummary(historyData);
+    const trend = calculateTrend(historyData, 30);
+    const worst = getWorstNeighborhoods(historyData, 5);
+    const seasonal = getSeasonalAnalysis(historyData);
+    
+    return {
+        totalOutages: historyData.length,
+        dateRange: {
+            start: new Date(Math.min(...historyData.map(e => new Date(e.startTime)))).toLocaleDateString(),
+            end: new Date(Math.max(...historyData.map(e => new Date(e.startTime)))).toLocaleDateString()
+        },
+        averageOutages: (historyData.length / Object.keys(monthSummary).length).toFixed(1),
+        trend,
+        worstNeighborhoods: worst,
+        peakHour: Math.max(...Object.values(hourDistribution), 0),
+        peakDay: Object.entries(dayDistribution).reduce((a, b) => a[1] > b[1] ? a : b)[0],
+        seasonalAnalysis: seasonal,
+        timeline
+    };
+}
+
 // Export for use in other files
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
@@ -313,6 +581,17 @@ if (typeof module !== 'undefined' && module.exports) {
         exportToCSV,
         getHourlyDistribution,
         getMonthlySummary,
-        findWorstMonth
+        findWorstMonth,
+        filterByDateRange,
+        filterByCause,
+        filterBySeverity,
+        filterByImpact,
+        searchByArea,
+        getOutageTimeline,
+        getDayOfWeekDistribution,
+        calculateTrend,
+        getWorstNeighborhoods,
+        getSeasonalAnalysis,
+        generateAdvancedAnalytics
     };
 }
