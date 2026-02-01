@@ -112,3 +112,8 @@ All commits authored by: lobsterhash@gmail.com
 - Displays minute-by-minute incident progression
 - Accessible from outage details via "View Timeline" link
 - Mock timeline generation from event metadata
+
+## Similarity Matching Feature
+- Compare current outages against 30 years of historical data
+- Match by location, time, customer count, and cause
+- Display confidence percentages
