@@ -1,7 +1,32 @@
 /**
  * shared-data.js - Shared utilities for NES Outage Checker
  * Handles zip code mapping, reverse geocoding, and area statistics
+ * Includes outage analytics, impact calculation, severity scoring
  */
+
+// Industry definitions and cost multipliers
+const INDUSTRY_DATA = {
+    'healthcare': { name: 'Healthcare', weight: 2.5, examples: ['hospitals', 'clinics', 'emergency'] },
+    'financial': { name: 'Financial Services', weight: 2.0, examples: ['banks', 'credit_unions', 'atms'] },
+    'retail': { name: 'Retail & Commerce', weight: 1.2, examples: ['stores', 'malls', 'gas_stations'] },
+    'manufacturing': { name: 'Manufacturing', weight: 2.3, examples: ['factories', 'plants', 'warehouses'] },
+    'telecom': { name: 'Telecommunications', weight: 1.8, examples: ['cell_towers', 'internet_hubs'] },
+    'transportation': { name: 'Transportation', weight: 1.5, examples: ['traffic_lights', 'buses', 'trains'] },
+    'residential': { name: 'Residential', weight: 1.0, examples: ['homes', 'apartments'] },
+    'education': { name: 'Education', weight: 0.8, examples: ['schools', 'universities'] }
+};
+
+// Average hourly cost impact by industry (in USD per hour)
+const HOURLY_IMPACT_COST = {
+    'healthcare': 450,      // Hospital critical operations
+    'financial': 380,       // ATMs, banking systems
+    'retail': 185,          // Point of sale, lighting, refrigeration
+    'manufacturing': 420,   // Production lines
+    'telecom': 320,         // Network infrastructure
+    'transportation': 280,  // Traffic management, transit
+    'residential': 35,      // Residential (per household)
+    'education': 90         // Schools, universities
+};
 
 // Nashville neighborhood zip code mappings
 const NASHVILLE_ZIP_CODES = {
@@ -568,9 +593,731 @@ function generateAdvancedAnalytics(historyData) {
     };
 }
 
+/**
+ * ==================== FEATURE 1: OUTAGE IMPACT CALCULATOR ====================
+ * Real-time cost estimation of outages by industry and household impact
+ */
+
+/**
+ * Calculate total economic impact of an outage
+ * Formula: (affected_customers × avg_income_per_hour × hours_lost) + industry_multipliers
+ * @param {number} affectedCustomers - Number of customers affected
+ * @param {number} durationHours - Duration in hours
+ * @param {Array} industries - Array of industry types present
+ * @returns {Object} Impact breakdown and total cost
+ */
+function calculateOutageImpact(affectedCustomers, durationHours, industries = ['residential']) {
+    const avgIncomePerHour = 45; // Nashville average household hourly impact
+    
+    // Base cost calculation
+    let baseCost = affectedCustomers * avgIncomePerHour * durationHours;
+    
+    // Calculate industry multipliers
+    let industryMultiplier = 1;
+    let industryBreakdown = {};
+    
+    industries.forEach(industry => {
+        const data = INDUSTRY_DATA[industry.toLowerCase()];
+        if (data) {
+            const multiplier = data.weight;
+            const share = 1 / industries.length; // Equal share if multiple industries
+            const costForIndustry = baseCost * share * multiplier;
+            industryBreakdown[industry] = {
+                name: data.name,
+                multiplier: multiplier,
+                estimatedCost: Math.round(costForIndustry)
+            };
+            industryMultiplier = (industryMultiplier + multiplier) / 2;
+        }
+    });
+    
+    const totalCost = Math.round(baseCost * industryMultiplier);
+    
+    // Family impact calculation: estimate from customers
+    const estimatedFamilies = Math.round(affectedCustomers * 0.08); // 8% of customers are businesses
+    const estimatedPeople = affectedCustomers * 3.5; // Average household size
+    
+    return {
+        totalCost: totalCost,
+        baseCost: Math.round(baseCost),
+        industriesAffected: industries,
+        industryBreakdown: industryBreakdown,
+        affectedCustomers: affectedCustomers,
+        durationHours: durationHours,
+        estimatedFamilies: estimatedFamilies,
+        estimatedPeople: estimatedPeople,
+        formattedCost: `$${(totalCost / 1000000).toFixed(1)}M`,
+        peakHourMultiplier: getTimeOfDayMultiplier(new Date()) // Peak hours cost more
+    };
+}
+
+/**
+ * Get time-of-day cost multiplier (peak hours 2-4 PM cost 2x)
+ * @param {Date} date - Date/time to evaluate
+ * @returns {number} Multiplier (1.0 = normal, 2.0 = peak)
+ */
+function getTimeOfDayMultiplier(date = new Date()) {
+    const hour = date.getHours();
+    const dayOfWeek = date.getDay();
+    
+    // Peak hours: 2 PM - 4 PM (14:00 - 16:00) on weekdays
+    if ((hour >= 14 && hour < 16) && dayOfWeek >= 1 && dayOfWeek <= 5) {
+        return 2.0;
+    }
+    
+    // Off-peak hours: 11 PM - 6 AM
+    if (hour >= 23 || hour < 6) {
+        return 0.6;
+    }
+    
+    // Normal hours
+    return 1.0;
+}
+
+/**
+ * Get formatted impact summary string
+ * @param {Object} impact - Impact object from calculateOutageImpact
+ * @returns {string} Readable summary
+ */
+function getImpactSummary(impact) {
+    return `This ${impact.durationHours.toFixed(1)}hr outage will cost Nashville ${impact.formattedCost} | ` +
+           `${impact.estimatedFamilies.toLocaleString()} families (~${impact.estimatedPeople.toLocaleString()} people) affected`;
+}
+
+/**
+ * ==================== FEATURE 2: SEVERITY SCORE (1-10 RANKING) ====================
+ * Quick visual severity ranking based on multiple factors
+ */
+
+/**
+ * Calculate comprehensive severity score (1-10)
+ * Formula combines: customers (0-5) + duration (0-2) + trend (0-1) + time_of_day (0-2)
+ * @param {Object} outage - Outage object with numPeople, estimated_eta, trend, timestamp
+ * @param {Array} recentOutages - Recent outages for trend analysis
+ * @returns {Object} Severity score and components
+ */
+function calculateSeverityScore(outage, recentOutages = []) {
+    let score = 0;
+    const components = {};
+    
+    // Component 1: Base on customers affected (0-5 scale)
+    const customersNormalized = Math.min(outage.numPeople / 50000, 5);
+    const customerScore = customersNormalized;
+    components.customers = customerScore;
+    score += customerScore;
+    
+    // Component 2: Duration estimate (0-2 scale)
+    const estimatedHours = outage.estimated_eta ? 
+        (new Date(outage.estimated_eta) - new Date(outage.startTime)) / (1000 * 60 * 60) : 2;
+    const durationScore = Math.min((estimatedHours / 6) * 2, 2);
+    components.duration = durationScore;
+    score += durationScore;
+    
+    // Component 3: Trend analysis (0-1 scale)
+    let trendScore = 0;
+    if (outage.trend === 'worsening') {
+        trendScore = 1.0;
+    } else if (outage.trend === 'stable') {
+        trendScore = 0.3;
+    } else if (outage.trend === 'improving') {
+        trendScore = 0;
+    }
+    components.trend = trendScore;
+    score += trendScore;
+    
+    // Component 4: Time of day multiplier (0-2 scale)
+    const timeMultiplier = getTimeOfDayMultiplier(new Date(outage.startTime));
+    const timeScore = timeMultiplier > 1.5 ? 2 : timeMultiplier > 1 ? 1.5 : 0.5;
+    components.timeOfDay = timeScore;
+    score += timeScore;
+    
+    // Cap at 10
+    score = Math.min(score, 10);
+    
+    return {
+        score: Math.round(score * 10) / 10,
+        severity: score >= 7 ? 'SEVERE' : score >= 5 ? 'HIGH' : score >= 3 ? 'MODERATE' : 'LOW',
+        badge: `⚠️ ${Math.round(score)}/10 ${score >= 7 ? 'SEVERE' : score >= 5 ? 'HIGH' : 'MODERATE'}`,
+        color: score >= 7 ? '#EF4444' : score >= 5 ? '#F97316' : '#F59E0B',
+        components: components,
+        reasoning: getSeverityReasoning(components, outage)
+    };
+}
+
+/**
+ * Generate human-readable reasoning for severity score
+ * @param {Object} components - Score components breakdown
+ * @param {Object} outage - Original outage object
+ * @returns {string} Readable explanation
+ */
+function getSeverityReasoning(components, outage) {
+    const reasons = [];
+    
+    if (components.customers > 3) reasons.push('Large number of customers affected');
+    if (components.duration > 1.5) reasons.push('Extended duration expected');
+    if (components.trend > 0.5) reasons.push(`Situation is ${outage.trend}`);
+    if (components.timeOfDay > 1) reasons.push('Occurred during peak hours');
+    
+    return reasons.length > 0 ? reasons.join(' + ') : 'Low impact incident';
+}
+
+/**
+ * Get badge color based on severity
+ * @param {number} score - Severity score (0-10)
+ * @returns {string} CSS color or hex value
+ */
+function getSeverityColor(score) {
+    if (score >= 7) return '#EF4444';      // Red
+    if (score >= 5) return '#F97316';      // Orange
+    if (score >= 3) return '#F59E0B';      // Amber
+    return '#10B981';                      // Green
+}
+
+/**
+ * ==================== FEATURE 4: OUTAGE SIMILARITY MATCHING ====================
+ * Compare current outages to historical patterns
+ */
+
+/**
+ * Calculate similarity between two outages (0-1 scale)
+ * Metrics: location, time_of_day, weather, customer_count, cause
+ * @param {Object} current - Current outage
+ * @param {Object} historical - Historical outage for comparison
+ * @returns {number} Similarity score (0-1)
+ */
+function calculateOutageSimilarity(current, historical) {
+    let similarities = [];
+    
+    // Location similarity (zip code match)
+    const locationMatch = current.zipCode === historical.zipCode ? 1 : 
+                         getZipCodeDistance(current.zipCode, historical.zipCode) < 5 ? 0.5 : 0;
+    similarities.push(locationMatch * 0.25);
+    
+    // Time of day similarity (within 2-hour window)
+    const currentHour = new Date(current.startTime).getHours();
+    const historicalHour = new Date(historical.startTime).getHours();
+    const hourDiff = Math.abs(currentHour - historicalHour);
+    const timeMatch = hourDiff <= 2 ? 1 : hourDiff <= 4 ? 0.5 : 0;
+    similarities.push(timeMatch * 0.2);
+    
+    // Customer count similarity (within 20%)
+    const customerRatio = current.numPeople / historical.numPeople;
+    const customerMatch = customerRatio >= 0.8 && customerRatio <= 1.2 ? 1 : 
+                         customerRatio >= 0.5 && customerRatio <= 1.5 ? 0.6 : 0.2;
+    similarities.push(customerMatch * 0.3);
+    
+    // Cause similarity
+    const causeMatch = (current.cause === historical.cause) ? 1 : 0.2;
+    similarities.push(causeMatch * 0.25);
+    
+    return similarities.reduce((a, b) => a + b, 0);
+}
+
+/**
+ * Get approximate distance between two zip codes
+ * @param {string} zip1 - First zip code
+ * @param {string} zip2 - Second zip code
+ * @returns {number} Approximate distance in miles
+ */
+function getZipCodeDistance(zip1, zip2) {
+    const z1 = NASHVILLE_ZIP_CODES[zip1];
+    const z2 = NASHVILLE_ZIP_CODES[zip2];
+    
+    if (!z1 || !z2) return 999;
+    
+    // Simple distance calculation in degrees (rough approximation)
+    const dist = Math.sqrt(Math.pow(z1.lat - z2.lat, 2) + Math.pow(z1.lon - z2.lon, 2));
+    return Math.round(dist * 70); // Convert to approximate miles
+}
+
+/**
+ * Find similar outages in history
+ * @param {Object} currentOutage - Current outage to match
+ * @param {Array} historyData - All historical outages
+ * @param {number} limit - Number of results to return
+ * @returns {Array} Top N similar outages with confidence
+ */
+function findSimilarOutages(currentOutage, historyData = [], limit = 3) {
+    if (!historyData || historyData.length === 0) return [];
+    
+    const similarities = historyData
+        .filter(h => h !== currentOutage) // Exclude current
+        .map(h => ({
+            outage: h,
+            similarity: calculateOutageSimilarity(currentOutage, h),
+            confidence: Math.round(calculateOutageSimilarity(currentOutage, h) * 100),
+            avgDuration: ((h.lastUpdatedTime - new Date(h.startTime)) / (1000 * 60 * 60)).toFixed(2),
+            when: new Date(h.startTime).toLocaleDateString()
+        }))
+        .sort((a, b) => b.similarity - a.similarity)
+        .slice(0, limit);
+    
+    return similarities;
+}
+
+/**
+ * ==================== FEATURE 5: NEIGHBORHOOD SAFETY SCORECARD ====================
+ * Reliability score and trend analysis by neighborhood
+ */
+
+/**
+ * Calculate neighborhood reliability score
+ * 100 - (frequency_penalty + duration_penalty + recent_incidents_penalty)
+ * @param {Object} areaStats - Area statistics with outages, avgDuration, etc
+ * @param {Array} historyData - All historical data for recent incidents
+ * @param {string} zipCode - Zip code for filtering recent incidents
+ * @returns {Object} Scorecard with score and trend
+ */
+function calculateNeighborhoodSafetyScore(areaStats, historyData = [], zipCode = null) {
+    // Frequency penalty (0-40 points)
+    const frequencyPenalty = Math.min(areaStats.outages * 3, 40);
+    
+    // Duration penalty (0-35 points)
+    const avgDurationHours = areaStats.avgDuration || (areaStats.totalDuration / areaStats.outages);
+    const durationPenalty = Math.min((avgDurationHours / 8) * 35, 35);
+    
+    // Recent incidents penalty (0-25 points) - outages in last 30 days
+    let recentIncidents = 0;
+    if (historyData.length > 0 && zipCode) {
+        const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+        recentIncidents = historyData.filter(e => 
+            e.zipCode === zipCode && new Date(e.startTime).getTime() > thirtyDaysAgo
+        ).length;
+    }
+    const recentPenalty = Math.min(recentIncidents * 5, 25);
+    
+    const score = Math.max(0, 100 - frequencyPenalty - durationPenalty - recentPenalty);
+    
+    return {
+        score: Math.round(score),
+        trend: 'stable', // Would calculate from historical data in real implementation
+        color: score >= 80 ? '#10B981' : score >= 60 ? '#F59E0B' : '#EF4444',
+        rating: score >= 80 ? 'Excellent' : score >= 60 ? 'Fair' : 'Poor',
+        components: {
+            frequencyPenalty: Math.round(frequencyPenalty),
+            durationPenalty: Math.round(durationPenalty),
+            recentPenalty: Math.round(recentPenalty)
+        },
+        monthlyTrend: (areaStats.monthlyChange || 0).toFixed(1) + '%'
+    };
+}
+
+/**
+ * Build complete neighborhood scorecard
+ * @param {Array} historyData - Historical outage data
+ * @returns {Array} Array of neighborhood scorecards
+ */
+function generateNeighborhoodScorecards(historyData = []) {
+    const areaStats = {};
+    
+    // Aggregate statistics by zip code
+    historyData.forEach(entry => {
+        const zip = entry.zipCode || 'unknown';
+        if (!areaStats[zip]) {
+            areaStats[zip] = {
+                zip: zip,
+                name: getNeighborhoodName(zip),
+                outages: 0,
+                totalDuration: 0,
+                totalAffected: 0,
+                lastOutage: null
+            };
+        }
+        
+        const duration = (entry.lastUpdatedTime - new Date(entry.startTime)) / (1000 * 60 * 60);
+        areaStats[zip].outages++;
+        areaStats[zip].totalDuration += duration;
+        areaStats[zip].totalAffected += entry.numPeople;
+        
+        const lastTime = new Date(entry.startTime).getTime();
+        if (!areaStats[zip].lastOutage || lastTime > areaStats[zip].lastOutage) {
+            areaStats[zip].lastOutage = lastTime;
+        }
+    });
+    
+    // Calculate scores and return sorted
+    return Object.values(areaStats)
+        .map(stats => ({
+            ...stats,
+            avgDuration: (stats.totalDuration / stats.outages).toFixed(2),
+            avgAffected: Math.round(stats.totalAffected / stats.outages),
+            scorecard: calculateNeighborhoodSafetyScore(stats, historyData, stats.zip)
+        }))
+        .sort((a, b) => b.scorecard.score - a.scorecard.score);
+}
+
+/**
+ * Get 30/90/1-year trend for a neighborhood
+ * @param {string} zipCode - Zip code to analyze
+ * @param {Array} historyData - Historical data
+ * @returns {Object} Trend data for multiple periods
+ */
+function getNeighborhoodTrends(zipCode, historyData = []) {
+    const now = Date.now();
+    const periods = {
+        '30-day': 30,
+        '90-day': 90,
+        '1-year': 365
+    };
+    
+    const trends = {};
+    
+    Object.entries(periods).forEach(([label, days]) => {
+        const start = now - (days * 24 * 60 * 60 * 1000);
+        const filtered = historyData.filter(e => 
+            e.zipCode === zipCode && new Date(e.startTime).getTime() > start
+        );
+        
+        trends[label] = {
+            outageCount: filtered.length,
+            totalAffected: filtered.reduce((sum, e) => sum + e.numPeople, 0),
+            avgDuration: filtered.length > 0 ? 
+                (filtered.reduce((sum, e) => sum + (e.lastUpdatedTime - new Date(e.startTime)), 0) / filtered.length / (1000 * 60 * 60)).toFixed(2) : 0
+        };
+    });
+    
+    return trends;
+}
+
+/**
+ * Export neighborhood scorecard to CSV
+ * @param {Array} scorecards - Array from generateNeighborhoodScorecards
+ * @returns {string} CSV content
+ */
+function exportScorecardToCSV(scorecards) {
+    const headers = ['Neighborhood', 'Zip Code', 'Reliability Score', 'Rating', 'Outages (30-day)', 'Avg Duration (hrs)', 'People Affected (Avg)'];
+    const rows = [];
+    
+    scorecards.forEach(sc => {
+        rows.push([
+            sc.name,
+            sc.zip,
+            sc.scorecard.score,
+            sc.scorecard.rating,
+            sc.outages,
+            sc.avgDuration,
+            sc.avgAffected
+        ]);
+    });
+    
+    const csv = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+    
+    return csv;
+}
+
+/**
+ * ==================== SMS/EMAIL ALERT UTILITIES (Twilio Integration) ====================
+ */
+
+/**
+ * Twilio SMS alert templates
+ */
+const ALERT_TEMPLATES = {
+    new_outage: (area, customersAffected, zipCode) => 
+        `🚨 New outage detected: ${area}, ${customersAffected.toLocaleString()} customers affected (${zipCode})`,
+    
+    power_restored: (area, time, zipCode) => 
+        `✅ Power restored in your area ${zipCode} at ${time}`,
+    
+    crew_assigned: (area, eta, zipCode) => 
+        `👷 Crews assigned to your outage in ${area}, expect power in ${eta}`,
+    
+    eta_update: (area, newEta, zipCode) => 
+        `⏱️ Updated ETA for ${area}: Power expected by ${newEta}`
+};
+
+/**
+ * SMS carriers for Twilio backend
+ */
+const SMS_CARRIERS = {
+    'ATT': 'AT&T',
+    'TMOBILE': 'T-Mobile',
+    'VERIZON': 'Verizon',
+    'SPRINT': 'Sprint',
+    'OTHER': 'Other'
+};
+
+/**
+ * Get Twilio API payload for SMS alert
+ * @param {string} phoneNumber - Recipient phone number
+ * @param {string} alertType - Type of alert (new_outage, power_restored, crew_assigned, eta_update)
+ * @param {Object} alertData - Alert data object
+ * @returns {Object} Twilio API payload
+ */
+function getTwilioPayload(phoneNumber, alertType, alertData) {
+    const message = ALERT_TEMPLATES[alertType]?.(
+        alertData.area || 'Your area',
+        alertData.customersAffected || 0,
+        alertData.zipCode || ''
+    ) || 'Power outage notification from NES';
+
+    return {
+        From: 'NES-OUTAGE',
+        To: phoneNumber,
+        Body: message,
+        MediaUrl: [],
+        Tags: ['nes-outage', alertType],
+        Timestamp: new Date().toISOString(),
+        AlertType: alertType,
+        Area: alertData.area || '',
+        ZipCode: alertData.zipCode || '',
+        Meta: alertData
+    };
+}
+
+/**
+ * Send test SMS alert (simulated - logs to console, ready for Twilio)
+ * @param {string} phoneNumber - Test phone number
+ * @param {string} carrier - Carrier info (for backend)
+ * @returns {Object} Simulated response
+ */
+function sendTestAlert(phoneNumber, carrier = 'OTHER') {
+    const testPayload = getTwilioPayload(phoneNumber, 'power_restored', {
+        area: 'Downtown/Capitol Hill',
+        zipCode: '37201',
+        time: new Date().toLocaleTimeString()
+    });
+
+    console.log('📱 [TWILIO SMS TEST]', {
+        timestamp: new Date().toISOString(),
+        phoneNumber,
+        carrier,
+        payload: testPayload,
+        status: 'SIMULATED - Ready for backend integration'
+    });
+
+    const recentAlerts = JSON.parse(localStorage.getItem('nes-recent-alerts') || '[]');
+    recentAlerts.unshift({
+        id: Date.now(),
+        type: 'sms',
+        phoneNumber,
+        message: testPayload.Body,
+        timestamp: new Date().toISOString(),
+        status: 'TEST'
+    });
+    localStorage.setItem('nes-recent-alerts', JSON.stringify(recentAlerts.slice(0, 50)));
+
+    return {
+        success: true,
+        message: `Test SMS sent to ${phoneNumber}`,
+        payload: testPayload,
+        status: 'SIMULATED'
+    };
+}
+
+/**
+ * Send test email alert (simulated)
+ * @param {string} email - Test email address
+ * @param {string} digestType - daily, weekly, or monthly
+ * @returns {Object} Simulated response
+ */
+function sendTestEmail(email, digestType = 'daily') {
+    const digestTemplates = {
+        daily: {
+            subject: '📊 NES Daily Outage Summary - Today',
+            body: 'What happened in your area today:\n\n- 2 outages detected\n- Avg duration: 42 minutes\n- Total customers affected: 3,200\n\nTop affected areas: Downtown (37201), North Nashville (37202)'
+        },
+        weekly: {
+            subject: '📈 NES Weekly Reliability Report',
+            body: 'Top 5 neighborhood statistics this week:\n\n1. Downtown (37201): 3 outages, avg 45 min\n2. East Nashville (37203): 2 outages, avg 38 min\n3. Antioch (37210): 2 outages, avg 52 min\n4. North Nashville (37202): 1 outage, avg 30 min\n5. Sylvan Park (37205): 1 outage, avg 28 min'
+        },
+        monthly: {
+            subject: '📋 NES Monthly Reliability Report - January 2024',
+            body: 'Reliability metrics for your area (37201):\n\nTotal outages: 8\nAverage duration: 41 minutes\nCustomers affected: 24,500\nReliability score: 92/100 (Excellent)\n\nComparison to city average: 15% better than average'
+        }
+    };
+
+    const emailContent = digestTemplates[digestType] || digestTemplates.daily;
+
+    console.log('📧 [EMAIL DIGEST TEST]', {
+        timestamp: new Date().toISOString(),
+        email,
+        digestType,
+        subject: emailContent.subject,
+        body: emailContent.body,
+        status: 'SIMULATED - Ready for backend integration'
+    });
+
+    const recentAlerts = JSON.parse(localStorage.getItem('nes-recent-alerts') || '[]');
+    recentAlerts.unshift({
+        id: Date.now(),
+        type: 'email',
+        email,
+        subject: emailContent.subject,
+        digestType,
+        timestamp: new Date().toISOString(),
+        status: 'TEST'
+    });
+    localStorage.setItem('nes-recent-alerts', JSON.stringify(recentAlerts.slice(0, 50)));
+
+    return {
+        success: true,
+        message: `Test ${digestType} email sent to ${email}`,
+        payload: emailContent,
+        status: 'SIMULATED'
+    };
+}
+
+/**
+ * ==================== GRID HEALTH UTILITIES ====================
+ */
+
+/**
+ * Generate realistic mock grid health status
+ * @param {Object} options - Optional overrides
+ * @returns {Object} Grid health metrics
+ */
+function generateGridHealthStatus(options = {}) {
+    const baseFreq = 60.00 + (Math.random() - 0.5) * 0.15;
+    const baseVoltage = 239 + (Math.random() - 0.5) * 8;
+    const baseLoad = 65 + Math.random() * 20;
+    const baseTransformer = 60 + Math.random() * 15;
+
+    const frequency = parseFloat(baseFreq.toFixed(2));
+    const voltage = parseFloat(baseVoltage.toFixed(1));
+    const loadPercentage = Math.round(baseLoad);
+    const transformerUtilization = Math.round(baseTransformer);
+    const activeOutages = Math.floor(Math.random() * 5) + 1;
+    
+    let gridStatus = 'STABLE';
+    let alerts = [];
+
+    if (frequency < 59.95 || frequency > 60.05) {
+        gridStatus = 'STRESSED';
+        alerts.push(`⚠️ Frequency drift detected: ${frequency} Hz`);
+    }
+    
+    if (voltage < 228 || voltage > 252) {
+        gridStatus = 'STRESSED';
+        alerts.push(`⚠️ Voltage out of safe range: ${voltage}V`);
+    }
+    
+    if (loadPercentage > 85) {
+        gridStatus = 'STRESSED';
+        alerts.push(`⚠️ High load detected: ${loadPercentage}%`);
+    }
+    
+    if (frequency < 59.90 || frequency > 60.10 || voltage < 220 || voltage > 260 || loadPercentage > 95) {
+        gridStatus = 'CRITICAL';
+        alerts.push(`🚨 CRITICAL: Grid operating outside safe parameters`);
+    }
+
+    let recommendation = 'Grid operating normally';
+    if (loadPercentage > 80) {
+        recommendation = `High load detected. Likely more outages in next 1-2 hours`;
+    }
+    if (frequency < 59.95) {
+        recommendation = `Frequency dropping - demand exceeding supply`;
+    }
+
+    return {
+        timestamp: new Date().toISOString(),
+        frequency,
+        voltage,
+        loadPercentage,
+        transformerUtilization,
+        activeOutages,
+        gridStatus,
+        alerts,
+        recommendation,
+        historicalTrend: generateGridHistoricalData()
+    };
+}
+
+/**
+ * Generate mock historical grid data (last 24 hours)
+ * @returns {Array} Historical data points
+ */
+function generateGridHistoricalData(dataPoints = 24) {
+    const data = [];
+    const now = Date.now();
+    const hourMs = 60 * 60 * 1000;
+
+    for (let i = dataPoints - 1; i >= 0; i--) {
+        const timestamp = new Date(now - i * hourMs);
+        const hour = timestamp.getHours();
+        const dayCycle = 0.5 + 0.3 * Math.sin((hour - 6) * Math.PI / 12);
+        
+        data.push({
+            timestamp: timestamp.toISOString(),
+            frequency: parseFloat((60.00 + (Math.random() - 0.5) * 0.1).toFixed(2)),
+            voltage: parseFloat((239 + (Math.random() - 0.5) * 6).toFixed(1)),
+            loadPercentage: Math.round(50 + dayCycle * 30 + (Math.random() - 0.5) * 10),
+            transformerUtilization: Math.round(55 + dayCycle * 20 + (Math.random() - 0.5) * 8)
+        });
+    }
+
+    return data;
+}
+
+/**
+ * Calculate grid health color coding
+ * Green: <70%, Yellow: 70-85%, Red: >85%
+ * @param {number} percentage - Percentage value
+ * @returns {Object} Color and status
+ */
+function getGridHealthColor(percentage) {
+    if (percentage < 70) {
+        return { color: '#10B981', status: 'NORMAL', label: 'Green' };
+    } else if (percentage < 85) {
+        return { color: '#F59E0B', status: 'WARNING', label: 'Yellow' };
+    } else {
+        return { color: '#EF4444', status: 'CRITICAL', label: 'Red' };
+    }
+}
+
+/**
+ * Get grid health metrics for dashboard summary
+ * @param {Object} gridStatus - Grid status from generateGridHealthStatus()
+ * @returns {Object} Formatted metrics for display
+ */
+function formatGridHealthMetrics(gridStatus) {
+    return {
+        frequency: {
+            value: gridStatus.frequency,
+            unit: 'Hz',
+            normal: '59.9-60.1',
+            actual: gridStatus.frequency,
+            status: gridStatus.frequency >= 59.9 && gridStatus.frequency <= 60.1 ? '✅' : '⚠️'
+        },
+        voltage: {
+            value: gridStatus.voltage,
+            unit: 'V',
+            normal: '230-250',
+            actual: gridStatus.voltage,
+            status: gridStatus.voltage >= 230 && gridStatus.voltage <= 250 ? '✅' : '⚠️'
+        },
+        load: {
+            value: gridStatus.loadPercentage,
+            unit: '%',
+            normal: '<70%',
+            actual: gridStatus.loadPercentage,
+            color: getGridHealthColor(gridStatus.loadPercentage),
+            status: gridStatus.loadPercentage < 70 ? '✅' : gridStatus.loadPercentage < 85 ? '⚠️' : '🚨'
+        },
+        transformer: {
+            value: gridStatus.transformerUtilization,
+            unit: '%',
+            normal: '<75%',
+            actual: gridStatus.transformerUtilization,
+            color: getGridHealthColor(gridStatus.transformerUtilization),
+            status: gridStatus.transformerUtilization < 75 ? '✅' : '⚠️'
+        },
+        outages: {
+            value: gridStatus.activeOutages,
+            unit: 'active',
+            status: gridStatus.activeOutages <= 2 ? '✅' : gridStatus.activeOutages <= 5 ? '⚠️' : '🚨'
+        }
+    };
+}
+
 // Export for use in other files
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
+        // Original exports
         NASHVILLE_ZIP_CODES,
         reverseGeocodeToZip,
         getNeighborhoodName,
@@ -592,6 +1339,36 @@ if (typeof module !== 'undefined' && module.exports) {
         calculateTrend,
         getWorstNeighborhoods,
         getSeasonalAnalysis,
-        generateAdvancedAnalytics
+        generateAdvancedAnalytics,
+        
+        // New feature exports
+        INDUSTRY_DATA,
+        HOURLY_IMPACT_COST,
+        calculateOutageImpact,
+        getTimeOfDayMultiplier,
+        getImpactSummary,
+        calculateSeverityScore,
+        getSeverityReasoning,
+        getSeverityColor,
+        calculateOutageSimilarity,
+        getZipCodeDistance,
+        findSimilarOutages,
+        calculateNeighborhoodSafetyScore,
+        generateNeighborhoodScorecards,
+        getNeighborhoodTrends,
+        exportScorecardToCSV,
+        
+        // SMS/Email alert exports
+        ALERT_TEMPLATES,
+        SMS_CARRIERS,
+        getTwilioPayload,
+        sendTestAlert,
+        sendTestEmail,
+        
+        // Grid health exports
+        generateGridHealthStatus,
+        generateGridHistoricalData,
+        getGridHealthColor,
+        formatGridHealthMetrics
     };
 }
